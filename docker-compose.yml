@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: couple-cards-backend
+    restart: unless-stopped
+    volumes:
+      # Persist SQLite database
+      - db_data:/data
+      # Mount card templates for seeding
+      - ./card_templates:/app/card_templates:ro
+    environment:
+      - DATABASE_URL=sqlite:////data/couple_cards.db
+    networks:
+      - couple-cards-network
+    # Expose for direct API access (optional, remove if only using through frontend)
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: couple-cards-frontend
+    restart: unless-stopped
+    ports:
+      # Expose on all interfaces for LAN access
+      - "0.0.0.0:3000:80"
+    depends_on:
+      - backend
+    networks:
+      - couple-cards-network
+
+  # Optional: One-time seed container
+  seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: couple-cards-seed
+    volumes:
+      - db_data:/data
+      - ./card_templates:/app/card_templates:ro
+    environment:
+      - DATABASE_URL=sqlite:////data/couple_cards.db
+    command: python seed_cards.py
+    networks:
+      - couple-cards-network
+    profiles:
+      - seed
+
+networks:
+  couple-cards-network:
+    driver: bridge
+
+volumes:
+  db_data:
+    driver: local
