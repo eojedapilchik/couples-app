@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   Box,
   Typography,
@@ -7,18 +6,12 @@ import {
   Chip,
   Button,
   Skeleton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Alert,
 } from '@mui/material';
 import {
   TrendingUp as CreditsIcon,
   Event as PeriodIcon,
   Inbox as ProposalsIcon,
   Add as AddIcon,
-  DeleteForever as ResetIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import MobileLayout from '../components/layout/MobileLayout';
@@ -26,7 +19,6 @@ import { useAuth } from '../context/AuthContext';
 import { useCredits } from '../hooks/useCredits';
 import { useActivePeriod } from '../hooks/usePeriods';
 import { useProposals } from '../hooks/useProposals';
-import { adminApi } from '../api/client';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -35,32 +27,7 @@ export default function Home() {
   const { period, isLoading: periodLoading } = useActivePeriod();
   const { proposals, isLoading: proposalsLoading } = useProposals(true, 'proposed');
 
-  const [resetDialog, setResetDialog] = useState(false);
-  const [resetLoading, setResetLoading] = useState(false);
-  const [resetResult, setResetResult] = useState<{ success: boolean; message: string } | null>(null);
-
   const pendingCount = proposals.length;
-  const isAdmin = user?.is_admin ?? false;
-
-  const handleReset = async () => {
-    if (!user) return;
-    setResetLoading(true);
-    try {
-      const result = await adminApi.resetAll(user.id);
-      setResetResult({
-        success: true,
-        message: `${result.votes_deleted} votos y ${result.proposals_deleted} retos eliminados`,
-      });
-      // Reload page after 2 seconds
-      setTimeout(() => window.location.reload(), 2000);
-    } catch (error) {
-      setResetResult({
-        success: false,
-        message: error instanceof Error ? error.message : 'Error al resetear',
-      });
-    }
-    setResetLoading(false);
-  };
 
   return (
     <MobileLayout title="Inicio">
@@ -180,57 +147,7 @@ export default function Home() {
             Ver Retos
           </Button>
         </Box>
-
-        {/* Admin Section */}
-        {isAdmin && (
-          <Box sx={{ mt: 4 }}>
-            <Typography variant="h6" fontWeight={600} color="error" sx={{ mb: 2 }}>
-              Administrador
-            </Typography>
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<ResetIcon />}
-              onClick={() => setResetDialog(true)}
-            >
-              Resetear Votos y Retos
-            </Button>
-          </Box>
-        )}
       </Box>
-
-      {/* Reset Confirmation Dialog */}
-      <Dialog open={resetDialog} onClose={() => !resetLoading && setResetDialog(false)}>
-        <DialogTitle>Confirmar Reset</DialogTitle>
-        <DialogContent>
-          {resetResult ? (
-            <Alert severity={resetResult.success ? 'success' : 'error'} sx={{ mt: 1 }}>
-              {resetResult.message}
-            </Alert>
-          ) : (
-            <Typography>
-              Esto eliminara TODOS los votos de cartas y TODOS los retos. Esta accion no se puede deshacer.
-            </Typography>
-          )}
-        </DialogContent>
-        <DialogActions>
-          {!resetResult && (
-            <>
-              <Button onClick={() => setResetDialog(false)} disabled={resetLoading}>
-                Cancelar
-              </Button>
-              <Button
-                variant="contained"
-                color="error"
-                onClick={handleReset}
-                disabled={resetLoading}
-              >
-                {resetLoading ? 'Reseteando...' : 'Si, Resetear Todo'}
-              </Button>
-            </>
-          )}
-        </DialogActions>
-      </Dialog>
     </MobileLayout>
   );
 }

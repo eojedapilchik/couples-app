@@ -5,3 +5,8 @@ pydantic==2.5.3
 pydantic-settings==2.1.0
 bcrypt==4.0.1
 python-multipart==0.0.6
+# Database drivers
+pymysql==1.1.0
+cryptography==42.0.0
+# Migrations
+alembic==1.13.1

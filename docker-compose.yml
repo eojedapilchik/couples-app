@@ -8,17 +8,44 @@ services:
     container_name: couple-cards-backend
     restart: unless-stopped
     volumes:
-      # Persist SQLite database
       - db_data:/data
-      # Mount card templates for seeding
       - ./card_templates:/app/card_templates:ro
     environment:
-      - DATABASE_URL=sqlite:////data/couple_cards.db
+      - DB_TYPE=${DB_TYPE:-sqlite}
+      - SQLITE_PATH=/data/couple_cards.db
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=couple_cards
+      - MYSQL_PASSWORD=couple_cards_secret
+      - MYSQL_DATABASE=couple_cards
     networks:
       - couple-cards-network
-    # Expose for direct API access (optional, remove if only using through frontend)
     ports:
       - "8000:8000"
+
+  mysql:
+    image: mysql:8.0
+    container_name: couple-cards-mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_secret
+      - MYSQL_DATABASE=couple_cards
+      - MYSQL_USER=couple_cards
+      - MYSQL_PASSWORD=couple_cards_secret
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - couple-cards-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secret"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    profiles:
+      - mysql
 
   frontend:
     build:
@@ -27,14 +54,12 @@ services:
     container_name: couple-cards-frontend
     restart: unless-stopped
     ports:
-      # Expose on all interfaces for LAN access
       - "0.0.0.0:3000:80"
     depends_on:
       - backend
     networks:
       - couple-cards-network
 
-  # Optional: One-time seed container
   seed:
     build:
       context: ./backend
@@ -44,12 +69,39 @@ services:
       - db_data:/data
       - ./card_templates:/app/card_templates:ro
     environment:
-      - DATABASE_URL=sqlite:////data/couple_cards.db
+      - DB_TYPE=${DB_TYPE:-sqlite}
+      - SQLITE_PATH=/data/couple_cards.db
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=couple_cards
+      - MYSQL_PASSWORD=couple_cards_secret
+      - MYSQL_DATABASE=couple_cards
     command: python seed_cards.py
     networks:
       - couple-cards-network
     profiles:
       - seed
+
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: couple-cards-migrate
+    volumes:
+      - db_data:/data
+    environment:
+      - DB_TYPE=${DB_TYPE:-sqlite}
+      - SQLITE_PATH=/data/couple_cards.db
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=couple_cards
+      - MYSQL_PASSWORD=couple_cards_secret
+      - MYSQL_DATABASE=couple_cards
+    command: alembic upgrade head
+    networks:
+      - couple-cards-network
+    profiles:
+      - migrate
 
 networks:
   couple-cards-network:
@@ -57,4 +109,6 @@ networks:
 
 volumes:
   db_data:
+    driver: local
+  mysql_data:
     driver: local

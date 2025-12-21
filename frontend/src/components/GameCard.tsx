@@ -57,11 +57,11 @@ export default function GameCard({
     },
     large: {
       height: 400,
-      titleSize: isLongText ? '1.3rem' : '1.5rem',
-      descSize: isVeryLongText ? '0.85rem' : isLongText ? '0.9rem' : '1rem',
+      titleSize: isLongText ? '1.5rem' : '1.75rem',
+      descSize: isVeryLongText ? '1rem' : isLongText ? '1.1rem' : '1.2rem',
       padding: 3,
-      tagSize: '0.8rem',
-      creditSize: '1.3rem',
+      tagSize: '0.9rem',
+      creditSize: '1.4rem',
     },
   };
 

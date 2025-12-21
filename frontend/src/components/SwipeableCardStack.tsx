@@ -22,6 +22,7 @@ export default function SwipeableCardStack({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [offset, setOffset] = useState(0);
   const [swiping, setSwiping] = useState(false);
+  const [exiting, setExiting] = useState(false);
   const busy = useRef(false);
 
   const currentCard = cards[currentIndex];
@@ -30,21 +31,27 @@ export default function SwipeableCardStack({
   const vote = (preference: PreferenceType) => {
     if (!currentCard || busy.current) return;
     busy.current = true;
+    setExiting(true);
 
     const direction = preference === 'like' ? 1 : -1;
-    setOffset(direction * 400);
+    setOffset(direction * 500);
 
     onVote(currentCard.id, preference).catch(console.error);
 
     setTimeout(() => {
+      // Reset without transition by keeping exiting=true
+      setOffset(0);
       setCurrentIndex((i) => {
         const next = i + 1;
         if (next >= cards.length && onComplete) onComplete();
         return next;
       });
-      setOffset(0);
-      setSwiping(false);
-      busy.current = false;
+      // Small delay before allowing transitions again
+      requestAnimationFrame(() => {
+        setExiting(false);
+        setSwiping(false);
+        busy.current = false;
+      });
     }, 150);
   };
 
@@ -114,7 +121,7 @@ export default function SwipeableCardStack({
             height: '100%',
             transform: `translateX(${offset}px) rotate(${offset / 20}deg)`,
             opacity: Math.abs(offset) > 300 ? 0 : 1,
-            transition: swiping ? 'none' : 'transform 0.15s ease-out, opacity 0.15s',
+            transition: (swiping || exiting) ? 'none' : 'transform 0.15s ease-out, opacity 0.15s',
             touchAction: 'pan-y',
             userSelect: 'none',
             cursor: 'grab',

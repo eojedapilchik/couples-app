@@ -16,6 +16,7 @@ import {
   SendAndArchive as ProposalsIcon,
   Assessment as ReportsIcon,
   Logout as LogoutIcon,
+  Settings as SettingsIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import CreditBadge from '../CreditBadge';
@@ -63,7 +64,12 @@ export default function MobileLayout({
           </Typography>
           {user && <CreditBadge />}
           {user && (
-            <IconButton onClick={handleLogout} size="small" sx={{ ml: 1 }}>
+            <IconButton onClick={() => navigate('/settings')} size="small" sx={{ ml: 1 }}>
+              <SettingsIcon />
+            </IconButton>
+          )}
+          {user && (
+            <IconButton onClick={handleLogout} size="small" sx={{ ml: 0.5 }}>
               <LogoutIcon />
             </IconButton>
           )}

@@ -6,6 +6,7 @@ import CardLibrary from './pages/CardLibrary';
 import Proposals from './pages/Proposals';
 import Period from './pages/Period';
 import Reports from './pages/Reports';
+import Settings from './pages/Settings';
 import { CircularProgress, Box } from '@mui/material';
 
 // Protected route wrapper
@@ -79,6 +80,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Reports />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Settings />
             </ProtectedRoute>
           }
         />
