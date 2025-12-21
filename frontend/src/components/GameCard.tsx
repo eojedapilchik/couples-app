@@ -14,10 +14,10 @@ interface GameCardProps {
 }
 
 const categoryIcons: Record<CardCategory, React.ReactNode> = {
-  calientes: <SpicyIcon sx={{ fontSize: 32 }} />,
-  romance: <RomanceIcon sx={{ fontSize: 32 }} />,
-  risas: <FunIcon sx={{ fontSize: 32 }} />,
-  otras: <OtherIcon sx={{ fontSize: 32 }} />,
+  calientes: <SpicyIcon sx={{ fontSize: 28 }} />,
+  romance: <RomanceIcon sx={{ fontSize: 28 }} />,
+  risas: <FunIcon sx={{ fontSize: 28 }} />,
+  otras: <OtherIcon sx={{ fontSize: 28 }} />,
 };
 
 const categoryLabels: Record<CardCategory, string> = {
@@ -33,10 +33,36 @@ export default function GameCard({
 }: GameCardProps) {
   const colors = getCategoryColor(card.category);
 
+  // Adjust font size based on description length
+  const descLength = card.description?.length || 0;
+  const isLongText = descLength > 150;
+  const isVeryLongText = descLength > 250;
+
   const sizeStyles = {
-    small: { minHeight: 250, titleSize: '1.25rem', descSize: '0.95rem', padding: 3 },
-    medium: { minHeight: 350, titleSize: '1.75rem', descSize: '1.1rem', padding: 4 },
-    large: { minHeight: 420, titleSize: '2rem', descSize: '1.2rem', padding: 4 },
+    small: {
+      height: 280,
+      titleSize: isLongText ? '1rem' : '1.15rem',
+      descSize: isVeryLongText ? '0.75rem' : isLongText ? '0.8rem' : '0.85rem',
+      padding: 2,
+      tagSize: '0.7rem',
+      creditSize: '1.1rem',
+    },
+    medium: {
+      height: 360,
+      titleSize: isLongText ? '1.2rem' : '1.4rem',
+      descSize: isVeryLongText ? '0.8rem' : isLongText ? '0.85rem' : '0.95rem',
+      padding: 2.5,
+      tagSize: '0.75rem',
+      creditSize: '1.25rem',
+    },
+    large: {
+      height: 400,
+      titleSize: isLongText ? '1.3rem' : '1.5rem',
+      descSize: isVeryLongText ? '0.85rem' : isLongText ? '0.9rem' : '1rem',
+      padding: 3,
+      tagSize: '0.8rem',
+      creditSize: '1.3rem',
+    },
   };
 
   const styles = sizeStyles[size];
@@ -46,8 +72,7 @@ export default function GameCard({
       sx={{
         bgcolor: colors.main,
         color: colors.contrastText,
-        minHeight: styles.minHeight,
-        height: '100%',
+        height: styles.height,
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
@@ -64,17 +89,20 @@ export default function GameCard({
           flexDirection: 'column',
           p: styles.padding,
           '&:last-child': { pb: styles.padding },
+          overflow: 'hidden',
         }}
       >
-        {/* Category Tag */}
+        {/* Category Tag - Centered */}
         <Typography
           variant="overline"
           sx={{
             opacity: 0.85,
-            letterSpacing: 2,
-            fontSize: '0.85rem',
-            mb: 3,
+            letterSpacing: 1.5,
+            fontSize: styles.tagSize,
+            mb: 1,
             fontWeight: 500,
+            flexShrink: 0,
+            textAlign: 'center',
           }}
         >
           {categoryLabels[card.category]}
@@ -87,50 +115,66 @@ export default function GameCard({
             fontWeight: 700,
             fontSize: styles.titleSize,
             lineHeight: 1.2,
-            mb: 3,
+            mb: 1.5,
+            flexShrink: 0,
           }}
         >
           {card.title}
         </Typography>
 
-        {/* Description */}
-        <Typography
+        {/* Description - scrollable if needed */}
+        <Box
           sx={{
             flexGrow: 1,
-            fontSize: styles.descSize,
-            lineHeight: 1.7,
-            opacity: 0.95,
+            overflow: 'auto',
+            mb: 1.5,
+            // Hide scrollbar but keep functionality
+            '&::-webkit-scrollbar': { width: 4 },
+            '&::-webkit-scrollbar-thumb': {
+              bgcolor: 'rgba(255,255,255,0.3)',
+              borderRadius: 2,
+            },
           }}
         >
-          {card.description}
-        </Typography>
+          <Typography
+            sx={{
+              fontSize: styles.descSize,
+              lineHeight: 1.5,
+              opacity: 0.95,
+            }}
+          >
+            {card.description}
+          </Typography>
+        </Box>
 
-        {/* Bottom Row: Credits + Icon */}
+        {/* Bottom Row: Credits + Icon - Always visible */}
         <Box
           sx={{
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'flex-end',
-            mt: 3,
+            alignItems: 'center',
+            flexShrink: 0,
+            pt: 1,
+            borderTop: '1px solid rgba(255,255,255,0.15)',
           }}
         >
-          {/* Credit Value - Bigger and more prominent */}
+          {/* Credit Value */}
           <Box
             sx={{
               bgcolor: 'rgba(255,255,255,0.25)',
               color: 'inherit',
-              px: 2.5,
-              py: 1,
-              borderRadius: 3,
+              px: 2,
+              py: 0.75,
+              borderRadius: 2,
               display: 'flex',
               alignItems: 'center',
-              gap: 1,
+              gap: 0.75,
             }}
           >
             <Typography
               sx={{
                 fontWeight: 700,
-                fontSize: '1.5rem',
+                fontSize: styles.creditSize,
                 lineHeight: 1,
               }}
             >
@@ -139,7 +183,7 @@ export default function GameCard({
             <Typography
               sx={{
                 fontWeight: 600,
-                fontSize: '0.9rem',
+                fontSize: '0.8rem',
                 opacity: 0.9,
               }}
             >

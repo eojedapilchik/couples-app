@@ -23,7 +23,6 @@ from app.schemas.period import (
     PeriodListResponse,
 )
 from app.schemas.proposal import (
-    ProposalBase,
     ProposalCreate,
     ProposalResponse,
     ProposalRespondRequest,
@@ -56,7 +55,6 @@ __all__ = [
     "PeriodResponse",
     "PeriodListResponse",
     # Proposal
-    "ProposalBase",
     "ProposalCreate",
     "ProposalResponse",
     "ProposalRespondRequest",

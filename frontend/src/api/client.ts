@@ -19,6 +19,7 @@ import type {
   CreditBalance,
   CreditLedgerListResponse,
   PreferenceType,
+  AdminResetResponse,
 } from './types';
 
 // API base URL - use proxy in dev, direct in production
@@ -202,6 +203,16 @@ export const creditsApi = {
   ): Promise<CreditLedgerListResponse> => {
     const { data } = await api.get('/credits/ledger', {
       params: { user_id: userId, ...params },
+    });
+    return data;
+  },
+};
+
+// Admin
+export const adminApi = {
+  resetAll: async (userId: number): Promise<AdminResetResponse> => {
+    const { data } = await api.post('/admin/reset', null, {
+      params: { user_id: userId },
     });
     return data;
   },

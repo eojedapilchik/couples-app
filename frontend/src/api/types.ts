@@ -26,6 +26,7 @@ export type LedgerType =
 export interface User {
   id: number;
   name: string;
+  is_admin: boolean;
   created_at: string;
 }
 
@@ -166,4 +167,11 @@ export interface CreditLedgerListResponse {
   entries: CreditLedgerEntry[];
   total: number;
   current_balance: number;
+}
+
+// Admin
+export interface AdminResetResponse {
+  message: string;
+  votes_deleted: number;
+  proposals_deleted: number;
 }

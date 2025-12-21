@@ -18,14 +18,16 @@ def main():
         users = db.query(User).all()
 
         for user in users:
-            if "A" in user.name or user.name == "Pareja A":
+            if "A" in user.name or user.name == "Pareja A" or user.name == "Poti":
                 user.name = "Poti"
                 user.pin_hash = hash_pin("2506")
+                user.is_admin = False
                 print(f"Updated user {user.id}: Poti (PIN: 2506)")
-            elif "B" in user.name or user.name == "Pareja B":
+            elif "B" in user.name or user.name == "Pareja B" or user.name == "Osi":
                 user.name = "Osi"
                 user.pin_hash = hash_pin("2105")
-                print(f"Updated user {user.id}: Osi (PIN: 2105)")
+                user.is_admin = True
+                print(f"Updated user {user.id}: Osi (PIN: 2105, ADMIN)")
 
         db.commit()
         print("\nUsers updated successfully!")
