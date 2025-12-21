@@ -1,0 +1,76 @@
+# Docker Compose for SQLite-only mode (lightweight, no MySQL)
+# Usage: docker compose -f docker-compose.sqlite.yml up -d
+
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: couple-cards-backend
+    restart: unless-stopped
+    volumes:
+      - db_data:/data
+      - ./card_templates:/app/card_templates:ro
+    environment:
+      - DB_TYPE=sqlite
+      - SQLITE_PATH=/data/couple_cards.db
+    networks:
+      - couple-cards-network
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: couple-cards-frontend
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:3000:80"
+    depends_on:
+      - backend
+    networks:
+      - couple-cards-network
+
+  seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: couple-cards-seed
+    volumes:
+      - db_data:/data
+      - ./card_templates:/app/card_templates:ro
+    environment:
+      - DB_TYPE=sqlite
+      - SQLITE_PATH=/data/couple_cards.db
+    command: python seed_cards.py
+    networks:
+      - couple-cards-network
+    profiles:
+      - seed
+
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: couple-cards-migrate
+    volumes:
+      - db_data:/data
+    environment:
+      - DB_TYPE=sqlite
+      - SQLITE_PATH=/data/couple_cards.db
+    command: alembic upgrade head
+    networks:
+      - couple-cards-network
+    profiles:
+      - migrate
+
+networks:
+  couple-cards-network:
+    driver: bridge
+
+volumes:
+  db_data:
+    driver: local
