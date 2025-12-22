@@ -6,11 +6,26 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
+  ToggleButton,
+  ToggleButtonGroup,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Typography,
 } from '@mui/material';
+import {
+  HowToVote as VoteIcon,
+  Visibility as BrowseIcon,
+} from '@mui/icons-material';
 import MobileLayout from '../components/layout/MobileLayout';
 import SwipeableCardStack from '../components/SwipeableCardStack';
 import { useCards } from '../hooks/useCards';
-import type { CardCategory, PreferenceType } from '../api/types';
+import { useProposals } from '../hooks/useProposals';
+import { useActivePeriod } from '../hooks/usePeriods';
+import { useAuth } from '../context/AuthContext';
+import type { CardCategory, PreferenceType, Card } from '../api/types';
 
 const categories: { value: CardCategory | 'all'; label: string }[] = [
   { value: 'all', label: 'Todas' },
@@ -22,22 +37,36 @@ const categories: { value: CardCategory | 'all'; label: string }[] = [
 
 export default function CardLibrary() {
   const [category, setCategory] = useState<CardCategory | 'all'>('all');
+  const [viewMode, setViewMode] = useState<'vote' | 'browse'>('vote');
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string }>({
     open: false,
     message: '',
   });
+  const [proposeDialog, setProposeDialog] = useState<{ open: boolean; card: Card | null }>({
+    open: false,
+    card: null,
+  });
 
+  const { partner } = useAuth();
+  const { period } = useActivePeriod();
+  const { createProposal } = useProposals();
+
+  // In vote mode, only show unvoted cards; in browse mode, show all
   const { cards, isLoading, error, voteOnCard } = useCards(
-    category === 'all' ? undefined : category
+    category === 'all' ? undefined : category,
+    viewMode === 'vote' // unvotedOnly
   );
 
   const handleVote = async (cardId: number, preference: PreferenceType) => {
     try {
       await voteOnCard(cardId, preference);
-      setSnackbar({
-        open: true,
-        message: preference === 'like' ? 'Te gusta!' : 'No te gusta',
-      });
+      const messages: Record<PreferenceType, string> = {
+        like: 'Te gusta!',
+        dislike: 'No te gusta',
+        maybe: 'Quizas / Por ti',
+        neutral: 'Sin votar',
+      };
+      setSnackbar({ open: true, message: messages[preference] });
     } catch {
       setSnackbar({ open: true, message: 'Error al votar' });
     }
@@ -49,12 +78,68 @@ export default function CardLibrary() {
 
   const handleCategoryChange = (_: unknown, newValue: CardCategory | 'all') => {
     setCategory(newValue);
-    // Don't call refetch() here - useEffect in useCards handles it automatically
+  };
+
+  const handleModeChange = (_: unknown, newMode: 'vote' | 'browse' | null) => {
+    if (newMode) {
+      setViewMode(newMode);
+    }
+  };
+
+  const handleProposeReto = (card: Card) => {
+    if (!period) {
+      setSnackbar({ open: true, message: 'No hay periodo activo. Crea uno primero.' });
+      return;
+    }
+    if (!partner) {
+      setSnackbar({ open: true, message: 'No tienes pareja configurada.' });
+      return;
+    }
+    setProposeDialog({ open: true, card });
+  };
+
+  const handleConfirmPropose = async () => {
+    if (!proposeDialog.card || !period || !partner) return;
+
+    try {
+      await createProposal({
+        card_id: proposeDialog.card.id,
+        proposed_to_user_id: partner.id,
+        period_id: period.id,
+        week_index: period.current_week || 1,
+      });
+      setProposeDialog({ open: false, card: null });
+      setSnackbar({ open: true, message: 'Reto enviado!' });
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Error al proponer reto',
+      });
+    }
   };
 
   return (
     <MobileLayout title="Cartas">
       <Box sx={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column' }}>
+        {/* Mode Toggle */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={handleModeChange}
+            size="small"
+          >
+            <ToggleButton value="vote">
+              <VoteIcon sx={{ mr: 0.5 }} />
+              Votar
+            </ToggleButton>
+            <ToggleButton value="browse">
+              <BrowseIcon sx={{ mr: 0.5 }} />
+              Ver Todas
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+
         {/* Category Tabs */}
         <Tabs
           value={category}
@@ -86,13 +171,39 @@ export default function CardLibrary() {
         {!isLoading && !error && (
           <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
             <SwipeableCardStack
-              key={category}
+              key={`${category}-${viewMode}`}
               cards={cards}
               onVote={handleVote}
               onComplete={handleComplete}
+              mode={viewMode}
+              onProposeReto={handleProposeReto}
             />
           </Box>
         )}
+
+        {/* Propose Reto Dialog */}
+        <Dialog
+          open={proposeDialog.open}
+          onClose={() => setProposeDialog({ open: false, card: null })}
+        >
+          <DialogTitle>Proponer Reto</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Enviar "{proposeDialog.card?.title}" como reto a {partner?.name || 'tu pareja'}?
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Tu pareja decidira cuantos venus te costara (1-7)
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setProposeDialog({ open: false, card: null })}>
+              Cancelar
+            </Button>
+            <Button variant="contained" onClick={handleConfirmPropose}>
+              Enviar Reto
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Snackbar */}
         <Snackbar

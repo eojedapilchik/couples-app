@@ -4,7 +4,7 @@
 export type CardCategory = 'calientes' | 'romance' | 'risas' | 'otras';
 export type CardSource = 'manual' | 'llm' | 'imported';
 export type CardStatus = 'active' | 'archived';
-export type PreferenceType = 'like' | 'dislike' | 'neutral';
+export type PreferenceType = 'like' | 'dislike' | 'neutral' | 'maybe';
 export type PeriodType = 'week' | 'month' | 'two_month';
 export type PeriodStatus = 'setup' | 'active' | 'done';
 export type ProposalStatus =

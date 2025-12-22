@@ -157,7 +157,7 @@ export default function ProposalCard({
             )}
             {proposal.credit_cost && (
               <Chip
-                label={`${proposal.credit_cost} creditos`}
+                label={`${proposal.credit_cost} venus`}
                 size="small"
                 sx={{
                   mt: 1,
@@ -236,12 +236,12 @@ export default function ProposalCard({
         )}
       </Card>
 
-      {/* Accept Dialog - Set Credit Cost */}
+      {/* Accept Dialog - Set Venus Cost */}
       <Dialog open={acceptDialog} onClose={() => setAcceptDialog(false)}>
-        <DialogTitle>Cuantos creditos le costara?</DialogTitle>
+        <DialogTitle>Cuantos venus le costara?</DialogTitle>
         <DialogContent sx={{ pt: 3 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Tu decides cuantos creditos le costara a {proposal.proposed_by?.name || 'tu pareja'} este reto.
+            Tu decides cuantos venus le costara a {proposal.proposed_by?.name || 'tu pareja'} este reto.
           </Typography>
           <Box sx={{ px: 2 }}>
             <Slider
@@ -263,10 +263,10 @@ export default function ProposalCard({
             />
           </Box>
           <Typography variant="h4" textAlign="center" sx={{ mt: 2, fontWeight: 700 }}>
-            {creditCost} creditos
+            {creditCost} venus
           </Typography>
           <Typography variant="caption" color="text.secondary" textAlign="center" display="block">
-            Al completar, tu ganaras estos creditos
+            Al completar, tu ganaras estos venus
           </Typography>
         </DialogContent>
         <DialogActions>

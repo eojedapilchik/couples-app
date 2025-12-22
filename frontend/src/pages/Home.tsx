@@ -8,11 +8,11 @@ import {
   Skeleton,
 } from '@mui/material';
 import {
-  TrendingUp as CreditsIcon,
   Event as PeriodIcon,
   Inbox as ProposalsIcon,
   Add as AddIcon,
 } from '@mui/icons-material';
+import VenusIcon from '../components/VenusIcon';
 import { useNavigate } from 'react-router-dom';
 import MobileLayout from '../components/layout/MobileLayout';
 import { useAuth } from '../context/AuthContext';
@@ -42,13 +42,13 @@ export default function Home() {
 
         {/* Stats Cards */}
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
-          {/* Credits */}
+          {/* Venus */}
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <CreditsIcon color="primary" />
+                <VenusIcon sx={{ color: '#e91e63' }} />
                 <Typography variant="subtitle2" color="text.secondary">
-                  Creditos
+                  Venus
                 </Typography>
               </Box>
               {creditsLoading ? (
@@ -108,7 +108,7 @@ export default function Home() {
                 </Typography>
                 <Typography variant="body2" sx={{ mt: 1 }}>
                   {period.cards_to_play_per_week} cartas por semana |{' '}
-                  {period.weekly_base_credits} creditos semanales
+                  {period.weekly_base_credits} venus semanales
                 </Typography>
               </Box>
             ) : (

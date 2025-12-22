@@ -30,6 +30,7 @@ class PreferenceType(str, Enum):
     LIKE = "like"
     DISLIKE = "dislike"
     NEUTRAL = "neutral"
+    MAYBE = "maybe"  # "To please you" - middle option
 
 
 class Card(Base):

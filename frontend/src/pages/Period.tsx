@@ -157,7 +157,7 @@ export default function Period() {
                     </Typography>
                     <Typography variant="body2" sx={{ mt: 1 }}>
                       {period.cards_to_play_per_week} cartas/semana |{' '}
-                      {period.weekly_base_credits} creditos/semana
+                      {period.weekly_base_credits} venus/semana
                     </Typography>
 
                     {/* Actions */}
@@ -218,7 +218,7 @@ export default function Period() {
               />
 
               <TextField
-                label="Creditos Semanales"
+                label="Venus Semanales"
                 type="number"
                 value={formData.weekly_base_credits}
                 onChange={(e) =>

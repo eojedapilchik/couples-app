@@ -61,7 +61,7 @@ export default function Proposals() {
       await respondToProposal(proposalId, response, creditCost);
       const msg =
         response === 'accepted'
-          ? `Aceptado! Le costara ${creditCost} creditos`
+          ? `Aceptado! Le costara ${creditCost} venus`
           : response === 'rejected'
           ? 'Rechazado'
           : 'Marcado para despues';
@@ -89,7 +89,7 @@ export default function Proposals() {
   const handleConfirm = async (proposalId: number) => {
     try {
       await confirmCompletion(proposalId);
-      setSnackbar({ open: true, message: 'Confirmado! Creditos otorgados' });
+      setSnackbar({ open: true, message: 'Confirmado! Venus otorgados' });
     } catch (err) {
       setSnackbar({
         open: true,
@@ -259,7 +259,7 @@ export default function Proposals() {
                   placeholder="Describe el reto con mas detalle..."
                 />
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-                  Tu pareja decidira cuantos creditos te costara (1-7)
+                  Tu pareja decidira cuantos venus te costara (1-7)
                 </Typography>
               </Box>
             ) : (
@@ -298,7 +298,7 @@ export default function Proposals() {
                         >
                           <ListItemText
                             primary={card.title}
-                            secondary={`${card.category} | ${card.credit_value} creditos sugeridos`}
+                            secondary={`${card.category} | ${card.credit_value} venus sugeridos`}
                           />
                         </ListItemButton>
                       </ListItem>

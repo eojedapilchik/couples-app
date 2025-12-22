@@ -1,5 +1,5 @@
 import { Chip } from '@mui/material';
-import { MonetizationOn as CreditIcon } from '@mui/icons-material';
+import VenusIcon from './VenusIcon';
 import { useCredits } from '../hooks/useCredits';
 
 export default function CreditBadge() {
@@ -7,8 +7,8 @@ export default function CreditBadge() {
 
   return (
     <Chip
-      icon={<CreditIcon />}
-      label={isLoading ? '...' : balance}
+      icon={<VenusIcon sx={{ color: '#e91e63' }} />}
+      label={isLoading ? '...' : `${balance} Venus`}
       color="primary"
       variant="outlined"
       size="small"

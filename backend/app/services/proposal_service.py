@@ -134,14 +134,14 @@ class ProposalService:
         # If accepting, require credit_cost
         if response == ProposalStatus.ACCEPTED:
             if credit_cost is None:
-                raise ProposalError("Debes establecer el costo en creditos (1-7)")
+                raise ProposalError("Debes establecer el costo en venus (1-7)")
             if credit_cost < 1 or credit_cost > ProposalService.MAX_CREDIT_COST:
                 raise ProposalError(f"El costo debe ser entre 1 y {ProposalService.MAX_CREDIT_COST}")
 
-            # Check proposer has sufficient credits
+            # Check proposer has sufficient venus
             if not CreditService.has_sufficient_credits(db, proposal.proposed_by_user_id, credit_cost):
                 raise ProposalError(
-                    f"El proponente no tiene suficientes creditos ({credit_cost} requeridos)"
+                    f"El proponente no tiene suficientes venus ({credit_cost} requeridos)"
                 )
 
             # Deduct credits from proposer
@@ -215,7 +215,7 @@ class ProposalService:
         # Get reward amount (credit_cost set when accepted)
         reward = proposal.credit_cost
         if not reward:
-            raise ProposalError("No hay costo de creditos establecido")
+            raise ProposalError("No hay costo de venus establecido")
 
         # Update status
         proposal.status = ProposalStatus.COMPLETED_CONFIRMED
