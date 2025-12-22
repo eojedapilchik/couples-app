@@ -10,3 +10,5 @@ pymysql==1.1.0
 cryptography==42.0.0
 # Migrations
 alembic==1.13.1
+# Environment
+python-dotenv==1.0.0

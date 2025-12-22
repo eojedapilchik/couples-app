@@ -1,9 +1,17 @@
 """Database setup with SQLAlchemy - supports SQLite and MySQL."""
 
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
+
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from sqlalchemy.pool import QueuePool, StaticPool
+
+# Load .env file from project root
+env_path = Path(__file__).parent.parent.parent.parent / ".env"
+load_dotenv(env_path)
 
 
 def get_database_url() -> str:
