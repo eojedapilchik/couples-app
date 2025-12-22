@@ -57,3 +57,12 @@ class PreferenceVoteResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class PartnerVotesResponse(BaseModel):
+    """Partner's votes grouped by preference type."""
+    like: list[CardResponse]
+    maybe: list[CardResponse]
+    dislike: list[CardResponse]
+    neutral: list[CardResponse]
+    total_mutual: int  # Total cards both have voted on

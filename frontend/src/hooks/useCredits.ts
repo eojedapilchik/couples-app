@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { CreditLedgerEntry } from '../api/types';
 import { creditsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { CURRENCY_NAME_LOWER } from '../config';
 
 export function useCredits() {
   const { user } = useAuth();
@@ -18,7 +19,7 @@ export function useCredits() {
       const data = await creditsApi.getBalance(user.id);
       setBalance(data.balance);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar creditos');
+      setError(err instanceof Error ? err.message : `Error al cargar ${CURRENCY_NAME_LOWER}`);
     } finally {
       setIsLoading(false);
     }

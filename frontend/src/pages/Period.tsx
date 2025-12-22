@@ -23,6 +23,7 @@ import { Add as AddIcon } from '@mui/icons-material';
 import MobileLayout from '../components/layout/MobileLayout';
 import { usePeriods, useActivePeriod } from '../hooks/usePeriods';
 import type { PeriodType, PeriodCreate } from '../api/types';
+import { STRINGS } from '../config';
 
 const periodTypeLabels: Record<PeriodType, string> = {
   week: '1 Semana',
@@ -157,7 +158,7 @@ export default function Period() {
                     </Typography>
                     <Typography variant="body2" sx={{ mt: 1 }}>
                       {period.cards_to_play_per_week} cartas/semana |{' '}
-                      {period.weekly_base_credits} venus/semana
+                      {STRINGS.period.currencyPerWeek(period.weekly_base_credits)}
                     </Typography>
 
                     {/* Actions */}
@@ -218,7 +219,7 @@ export default function Period() {
               />
 
               <TextField
-                label="Venus Semanales"
+                label={STRINGS.period.weeklyCurrency}
                 type="number"
                 value={formData.weekly_base_credits}
                 onChange={(e) =>

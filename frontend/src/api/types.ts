@@ -15,6 +15,8 @@ export type ProposalStatus =
   | 'completed_pending_confirmation'
   | 'completed_confirmed'
   | 'expired';
+export type ChallengeType = 'simple' | 'guided' | 'custom';
+export type RewardType = 'none' | 'credits' | 'coupon' | 'choose_next';
 export type LedgerType =
   | 'weekly_base_grant'
   | 'proposal_cost'
@@ -111,8 +113,18 @@ export interface Proposal {
   proposed_by_user_id: number;
   proposed_to_user_id: number;
   card_id: number | null;
+  challenge_type: ChallengeType;
   custom_title: string | null;
   custom_description: string | null;
+  // Guided challenge fields
+  why_proposing?: string | null;
+  boundary?: string | null;
+  // Custom challenge fields
+  location?: string | null;
+  duration?: string | null;
+  boundaries_json?: string | null;
+  reward_type?: RewardType | null;
+  reward_details?: string | null;
   credit_cost: number | null;
   status: ProposalStatus;
   created_at: string;
@@ -130,10 +142,20 @@ export interface ProposalCreate {
   proposed_to_user_id: number;
   period_id: number;
   week_index?: number;
+  challenge_type?: ChallengeType;
   // Card-based OR custom
   card_id?: number | null;
   custom_title?: string | null;
   custom_description?: string | null;
+  // Guided challenge fields
+  why_proposing?: string | null;
+  boundary?: string | null;
+  // Custom challenge fields
+  location?: string | null;
+  duration?: string | null;
+  boundaries_json?: string | null;
+  reward_type?: RewardType | null;
+  reward_details?: string | null;
 }
 
 export interface ProposalRespondRequest {
@@ -167,6 +189,15 @@ export interface CreditLedgerListResponse {
   entries: CreditLedgerEntry[];
   total: number;
   current_balance: number;
+}
+
+// Partner Votes (grouped by preference)
+export interface PartnerVotesResponse {
+  like: Card[];
+  maybe: Card[];
+  dislike: Card[];
+  neutral: Card[];
+  total_mutual: number;
 }
 
 // Admin

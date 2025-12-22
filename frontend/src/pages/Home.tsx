@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import MobileLayout from '../components/layout/MobileLayout';
 import { useAuth } from '../context/AuthContext';
 import { useCredits } from '../hooks/useCredits';
+import { CURRENCY_NAME, STRINGS } from '../config';
 import { useActivePeriod } from '../hooks/usePeriods';
 import { useProposals } from '../hooks/useProposals';
 
@@ -48,7 +49,7 @@ export default function Home() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <VenusIcon sx={{ color: '#e91e63' }} />
                 <Typography variant="subtitle2" color="text.secondary">
-                  Venus
+                  {CURRENCY_NAME}
                 </Typography>
               </Box>
               {creditsLoading ? (
@@ -108,7 +109,7 @@ export default function Home() {
                 </Typography>
                 <Typography variant="body2" sx={{ mt: 1 }}>
                   {period.cards_to_play_per_week} cartas por semana |{' '}
-                  {period.weekly_base_credits} venus semanales
+                  {STRINGS.home.weeklyCurrency(period.weekly_base_credits)}
                 </Typography>
               </Box>
             ) : (

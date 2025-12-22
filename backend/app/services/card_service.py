@@ -187,3 +187,65 @@ class CardService:
             db.commit()
             db.refresh(card)
         return card
+
+    @staticmethod
+    def get_partner_votes_grouped(
+        db: Session, user_id: int, partner_id: int
+    ) -> dict[str, list[dict]]:
+        """
+        Get cards where both users have voted, grouped by partner's preference.
+        Returns dict with keys: like, maybe, dislike, neutral
+        Each card includes both partner's preference and user's own preference.
+        """
+        # Get all cards where BOTH users have voted
+        user_votes = db.query(PreferenceVote.card_id).filter(
+            PreferenceVote.user_id == user_id
+        ).subquery()
+
+        partner_votes = db.query(PreferenceVote).filter(
+            PreferenceVote.user_id == partner_id,
+            PreferenceVote.card_id.in_(user_votes),
+        ).all()
+
+        # Group by partner's preference
+        result: dict[str, list[dict]] = {
+            "like": [],
+            "maybe": [],
+            "dislike": [],
+            "neutral": [],
+        }
+
+        for partner_vote in partner_votes:
+            card = db.query(Card).filter(
+                Card.id == partner_vote.card_id,
+                Card.status == CardStatus.ACTIVE,
+            ).first()
+
+            if not card:
+                continue
+
+            # Get user's own vote on this card
+            user_vote = CardService.get_user_vote(db, user_id, card.id)
+
+            card_dict = {
+                "id": card.id,
+                "title": card.title,
+                "description": card.description,
+                "category": card.category,
+                "spice_level": card.spice_level,
+                "difficulty_level": card.difficulty_level,
+                "credit_value": card.credit_value,
+                "tags": card.tags,
+                "source": card.source,
+                "status": card.status,
+                "created_at": card.created_at,
+                "user_preference": user_vote.preference if user_vote else None,
+                "partner_preference": partner_vote.preference,
+            }
+
+            # Add to appropriate group based on partner's preference
+            pref_key = partner_vote.preference.value  # like, maybe, dislike, neutral
+            if pref_key in result:
+                result[pref_key].append(card_dict)
+
+        return result

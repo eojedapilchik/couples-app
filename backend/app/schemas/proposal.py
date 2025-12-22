@@ -3,7 +3,7 @@
 from datetime import datetime
 from pydantic import BaseModel, Field, model_validator
 
-from app.models.proposal import ProposalStatus
+from app.models.proposal import ProposalStatus, ChallengeType, RewardType
 from app.schemas.card import CardResponse
 from app.schemas.user import UserResponse
 
@@ -14,6 +14,9 @@ class ProposalCreate(BaseModel):
     period_id: int
     week_index: int = Field(default=1, ge=1)
 
+    # Challenge type (defaults to simple)
+    challenge_type: ChallengeType = Field(default=ChallengeType.SIMPLE)
+
     # Card-based (optional)
     card_id: int | None = None
 
@@ -21,11 +24,37 @@ class ProposalCreate(BaseModel):
     custom_title: str | None = Field(None, max_length=200)
     custom_description: str | None = Field(None, max_length=1000)
 
+    # Guided challenge fields (Level 2)
+    why_proposing: str | None = Field(None, max_length=500)
+    boundary: str | None = Field(None, max_length=300)
+
+    # Custom challenge fields (Level 3)
+    location: str | None = Field(None, max_length=100)
+    duration: str | None = Field(None, max_length=50)
+    boundaries_json: str | None = None  # JSON array of boundaries
+    reward_type: RewardType | None = None
+    reward_details: str | None = Field(None, max_length=200)
+
     @model_validator(mode='after')
     def validate_card_or_custom(self):
         """Must have either card_id OR custom_title."""
         if not self.card_id and not self.custom_title:
             raise ValueError("Debe proporcionar card_id o custom_title")
+        return self
+
+    @model_validator(mode='after')
+    def validate_guided_fields(self):
+        """Guided challenges require a boundary."""
+        if self.challenge_type == ChallengeType.GUIDED and not self.boundary:
+            raise ValueError("Los retos guiados requieren un limite/boundary")
+        return self
+
+    @model_validator(mode='after')
+    def validate_custom_fields(self):
+        """Custom challenges require location and boundaries."""
+        if self.challenge_type == ChallengeType.CUSTOM:
+            if not self.boundaries_json:
+                raise ValueError("Los retos personalizados requieren limites/boundaries")
         return self
 
 
@@ -36,8 +65,21 @@ class ProposalResponse(BaseModel):
     proposed_by_user_id: int
     proposed_to_user_id: int
     card_id: int | None
+    challenge_type: ChallengeType
     custom_title: str | None
     custom_description: str | None
+
+    # Guided challenge fields
+    why_proposing: str | None = None
+    boundary: str | None = None
+
+    # Custom challenge fields
+    location: str | None = None
+    duration: str | None = None
+    boundaries_json: str | None = None
+    reward_type: RewardType | None = None
+    reward_details: str | None = None
+
     credit_cost: int | None
     status: ProposalStatus
     created_at: datetime

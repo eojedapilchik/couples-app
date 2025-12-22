@@ -3,9 +3,10 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from app.models.proposal import Proposal, ProposalStatus
+from app.models.proposal import Proposal, ProposalStatus, ChallengeType, RewardType
 from app.models.card import Card
 from app.services.credit_service import CreditService
+from app.config import CURRENCY_NAME_LOWER
 
 
 class ProposalError(Exception):
@@ -62,10 +63,20 @@ class ProposalService:
         card_id: int | None = None,
         custom_title: str | None = None,
         custom_description: str | None = None,
+        # Challenge type and guided/custom fields
+        challenge_type: ChallengeType = ChallengeType.SIMPLE,
+        why_proposing: str | None = None,
+        boundary: str | None = None,
+        location: str | None = None,
+        duration: str | None = None,
+        boundaries_json: str | None = None,
+        reward_type: RewardType | None = None,
+        reward_details: str | None = None,
     ) -> Proposal:
         """
         Create a new proposal.
         Can be from a card OR a custom reto.
+        Supports 3 challenge types: simple, guided, custom.
         Proposing is FREE - credits are charged when recipient accepts.
         """
         # Validate: must have card_id OR custom_title
@@ -85,8 +96,18 @@ class ProposalService:
             proposed_by_user_id=proposed_by_user_id,
             proposed_to_user_id=proposed_to_user_id,
             card_id=card_id,
+            challenge_type=challenge_type,
             custom_title=custom_title,
             custom_description=custom_description,
+            # Guided challenge fields
+            why_proposing=why_proposing,
+            boundary=boundary,
+            # Custom challenge fields
+            location=location,
+            duration=duration,
+            boundaries_json=boundaries_json,
+            reward_type=reward_type,
+            reward_details=reward_details,
             status=ProposalStatus.PROPOSED,
         )
         db.add(proposal)
@@ -134,14 +155,14 @@ class ProposalService:
         # If accepting, require credit_cost
         if response == ProposalStatus.ACCEPTED:
             if credit_cost is None:
-                raise ProposalError("Debes establecer el costo en venus (1-7)")
+                raise ProposalError(f"Debes establecer el costo en {CURRENCY_NAME_LOWER} (1-7)")
             if credit_cost < 1 or credit_cost > ProposalService.MAX_CREDIT_COST:
                 raise ProposalError(f"El costo debe ser entre 1 y {ProposalService.MAX_CREDIT_COST}")
 
-            # Check proposer has sufficient venus
+            # Check proposer has sufficient currency
             if not CreditService.has_sufficient_credits(db, proposal.proposed_by_user_id, credit_cost):
                 raise ProposalError(
-                    f"El proponente no tiene suficientes venus ({credit_cost} requeridos)"
+                    f"El proponente no tiene suficientes {CURRENCY_NAME_LOWER} ({credit_cost} requeridos)"
                 )
 
             # Deduct credits from proposer
@@ -215,7 +236,7 @@ class ProposalService:
         # Get reward amount (credit_cost set when accepted)
         reward = proposal.credit_cost
         if not reward:
-            raise ProposalError("No hay costo de venus establecido")
+            raise ProposalError(f"No hay costo de {CURRENCY_NAME_LOWER} establecido")
 
         # Update status
         proposal.status = ProposalStatus.COMPLETED_CONFIRMED

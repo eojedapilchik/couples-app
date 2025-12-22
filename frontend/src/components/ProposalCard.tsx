@@ -21,8 +21,22 @@ import {
   Done as CompleteIcon,
   Verified as ConfirmIcon,
 } from '@mui/icons-material';
-import type { Proposal, ProposalStatus } from '../api/types';
+import type { Proposal, ProposalStatus, ChallengeType, RewardType } from '../api/types';
 import { getCategoryColor } from '../theme/theme';
+import { STRINGS, CURRENCY_NAME } from '../config';
+
+const challengeTypeLabels: Record<ChallengeType, { label: string; color: string }> = {
+  simple: { label: 'Simple', color: '#4CAF50' },
+  guided: { label: 'Guiado', color: '#9C27B0' },
+  custom: { label: 'Personalizado', color: '#FF9800' },
+};
+
+const rewardTypeLabels: Record<RewardType, string> = {
+  none: 'Ninguna',
+  credits: CURRENCY_NAME,
+  coupon: 'Cupon',
+  choose_next: 'Elegir siguiente reto',
+};
 
 interface ProposalCardProps {
   proposal: Proposal;
@@ -144,9 +158,23 @@ export default function ProposalCard({
               mb: 2,
             }}
           >
-            <Typography variant="subtitle2" sx={{ opacity: 0.8, mb: 0.5 }}>
-              {isCustom ? '#reto-personalizado' : `#${proposal.card?.category}`}
-            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
+              <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>
+                {isCustom ? '#reto-personalizado' : `#${proposal.card?.category}`}
+              </Typography>
+              {proposal.challenge_type && proposal.challenge_type !== 'simple' && (
+                <Chip
+                  label={challengeTypeLabels[proposal.challenge_type].label}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: '0.65rem',
+                    bgcolor: challengeTypeLabels[proposal.challenge_type].color,
+                    color: 'white',
+                  }}
+                />
+              )}
+            </Box>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
               {displayTitle}
             </Typography>
@@ -155,9 +183,83 @@ export default function ProposalCard({
                 {displayDescription}
               </Typography>
             )}
+
+            {/* Guided/Custom: Why proposing */}
+            {proposal.why_proposing && (
+              <Typography variant="body2" sx={{ opacity: 0.85, mt: 1, fontStyle: 'italic' }}>
+                Por que: {proposal.why_proposing}
+              </Typography>
+            )}
+
+            {/* Guided: Boundary */}
+            {proposal.challenge_type === 'guided' && proposal.boundary && (
+              <Chip
+                label={`Limite: ${proposal.boundary}`}
+                size="small"
+                sx={{
+                  mt: 1,
+                  bgcolor: 'rgba(255,255,255,0.2)',
+                  color: 'inherit',
+                }}
+              />
+            )}
+
+            {/* Custom: Location & Duration */}
+            {proposal.challenge_type === 'custom' && (proposal.location || proposal.duration) && (
+              <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {proposal.location && (
+                  <Chip
+                    label={`Lugar: ${proposal.location}`}
+                    size="small"
+                    sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'inherit' }}
+                  />
+                )}
+                {proposal.duration && (
+                  <Chip
+                    label={`Duracion: ${proposal.duration}`}
+                    size="small"
+                    sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'inherit' }}
+                  />
+                )}
+              </Box>
+            )}
+
+            {/* Custom: Boundaries */}
+            {proposal.challenge_type === 'custom' && proposal.boundaries_json && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="caption" sx={{ opacity: 0.8 }}>Limites:</Typography>
+                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
+                  {JSON.parse(proposal.boundaries_json).map((b: string, i: number) => (
+                    <Chip
+                      key={i}
+                      label={b}
+                      size="small"
+                      sx={{ fontSize: '0.65rem', height: 20, bgcolor: 'rgba(255,255,255,0.15)', color: 'inherit' }}
+                    />
+                  ))}
+                </Box>
+              </Box>
+            )}
+
+            {/* Custom: Reward */}
+            {proposal.challenge_type === 'custom' && proposal.reward_type && proposal.reward_type !== 'none' && (
+              <Chip
+                label={`Recompensa: ${rewardTypeLabels[proposal.reward_type] || proposal.reward_type}${
+                  proposal.reward_details && proposal.reward_type === 'credits' ? ` (${proposal.reward_details})` :
+                  proposal.reward_details && proposal.reward_type === 'coupon' ? ` - ${proposal.reward_details}` : ''
+                }`}
+                size="small"
+                sx={{
+                  mt: 1,
+                  bgcolor: 'rgba(255,215,0,0.3)',
+                  color: 'inherit',
+                }}
+              />
+            )}
+
             {proposal.credit_cost && (
               <Chip
-                label={`${proposal.credit_cost} venus`}
+                label={STRINGS.currency.cost(proposal.credit_cost)}
                 size="small"
                 sx={{
                   mt: 1,
@@ -236,12 +338,12 @@ export default function ProposalCard({
         )}
       </Card>
 
-      {/* Accept Dialog - Set Venus Cost */}
+      {/* Accept Dialog - Set Currency Cost */}
       <Dialog open={acceptDialog} onClose={() => setAcceptDialog(false)}>
-        <DialogTitle>Cuantos venus le costara?</DialogTitle>
+        <DialogTitle>{STRINGS.currency.costQuestion}</DialogTitle>
         <DialogContent sx={{ pt: 3 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Tu decides cuantos venus le costara a {proposal.proposed_by?.name || 'tu pareja'} este reto.
+            {STRINGS.currency.youDecideCost(proposal.proposed_by?.name || 'tu pareja')}
           </Typography>
           <Box sx={{ px: 2 }}>
             <Slider
@@ -263,10 +365,10 @@ export default function ProposalCard({
             />
           </Box>
           <Typography variant="h4" textAlign="center" sx={{ mt: 2, fontWeight: 700 }}>
-            {creditCost} venus
+            {STRINGS.currency.cost(creditCost)}
           </Typography>
           <Typography variant="caption" color="text.secondary" textAlign="center" display="block">
-            Al completar, tu ganaras estos venus
+            {STRINGS.currency.onCompletionEarn}
           </Typography>
         </DialogContent>
         <DialogActions>

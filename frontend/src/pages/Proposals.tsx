@@ -11,32 +11,31 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions,
   Button,
   List,
   ListItem,
   ListItemButton,
   ListItemText,
-  TextField,
   Divider,
 } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import MobileLayout from '../components/layout/MobileLayout';
 import ProposalCard from '../components/ProposalCard';
+import ChallengeWizard from '../components/ChallengeWizard';
 import { useProposals } from '../hooks/useProposals';
 import { useLikedByBoth } from '../hooks/useCards';
 import { useActivePeriod } from '../hooks/usePeriods';
 import { useAuth } from '../context/AuthContext';
-import type { ProposalStatus, Card } from '../api/types';
+import type { ProposalStatus, Card, ProposalCreate } from '../api/types';
+import { STRINGS } from '../config';
 
 export default function Proposals() {
   const { partner } = useAuth();
   const [tab, setTab] = useState<'received' | 'sent'>('received');
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
   const [proposeDialog, setProposeDialog] = useState(false);
-  const [customMode, setCustomMode] = useState(false);
-  const [customTitle, setCustomTitle] = useState('');
-  const [customDescription, setCustomDescription] = useState('');
+  const [wizardMode, setWizardMode] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     proposals,
@@ -61,10 +60,10 @@ export default function Proposals() {
       await respondToProposal(proposalId, response, creditCost);
       const msg =
         response === 'accepted'
-          ? `Aceptado! Le costara ${creditCost} venus`
+          ? STRINGS.proposals.accepted(creditCost || 0)
           : response === 'rejected'
-          ? 'Rechazado'
-          : 'Marcado para despues';
+          ? STRINGS.proposals.rejected
+          : STRINGS.proposals.markedForLater;
       setSnackbar({ open: true, message: msg });
     } catch (err) {
       setSnackbar({
@@ -89,7 +88,7 @@ export default function Proposals() {
   const handleConfirm = async (proposalId: number) => {
     try {
       await confirmCompletion(proposalId);
-      setSnackbar({ open: true, message: 'Confirmado! Venus otorgados' });
+      setSnackbar({ open: true, message: STRINGS.proposals.confirmed });
     } catch (err) {
       setSnackbar({
         open: true,
@@ -122,44 +121,42 @@ export default function Proposals() {
     }
   };
 
-  const handleProposeCustom = async () => {
+  const handleWizardSubmit = async (data: Partial<ProposalCreate>) => {
     if (!period || !partner) {
       setSnackbar({ open: true, message: 'No hay periodo activo o pareja' });
       return;
     }
 
-    if (!customTitle.trim()) {
-      setSnackbar({ open: true, message: 'Escribe un titulo para el reto' });
-      return;
-    }
-
+    setIsSubmitting(true);
     try {
       await createProposal({
-        custom_title: customTitle.trim(),
-        custom_description: customDescription.trim() || undefined,
+        ...data,
         proposed_to_user_id: partner.id,
         period_id: period.id,
         week_index: period.current_week || 1,
-      });
+      } as ProposalCreate);
       setProposeDialog(false);
-      setCustomMode(false);
-      setCustomTitle('');
-      setCustomDescription('');
-      setSnackbar({ open: true, message: 'Reto personalizado enviado!' });
+      setWizardMode(false);
+      const typeLabels = {
+        simple: 'Reto simple enviado!',
+        guided: 'Reto guiado enviado!',
+        custom: 'Reto personalizado enviado!',
+      };
+      setSnackbar({ open: true, message: typeLabels[data.challenge_type || 'simple'] });
       refetch();
     } catch (err) {
       setSnackbar({
         open: true,
         message: err instanceof Error ? err.message : 'Error al proponer',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const closeDialog = () => {
     setProposeDialog(false);
-    setCustomMode(false);
-    setCustomTitle('');
-    setCustomDescription('');
+    setWizardMode(false);
   };
 
   return (
@@ -229,7 +226,7 @@ export default function Proposals() {
           maxWidth="sm"
         >
           <DialogTitle>
-            {customMode ? 'Crear Reto Personalizado' : 'Proponer un Reto'}
+            {wizardMode ? 'Crear Reto' : 'Proponer un Reto'}
           </DialogTitle>
           <DialogContent>
             {!period && (
@@ -238,37 +235,20 @@ export default function Proposals() {
               </Alert>
             )}
 
-            {customMode ? (
-              // Custom reto form
-              <Box sx={{ mt: 1 }}>
-                <TextField
-                  label="Titulo del reto"
-                  fullWidth
-                  value={customTitle}
-                  onChange={(e) => setCustomTitle(e.target.value)}
-                  sx={{ mb: 2 }}
-                  placeholder="Ej: Masaje de 30 minutos"
-                />
-                <TextField
-                  label="Descripcion (opcional)"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  value={customDescription}
-                  onChange={(e) => setCustomDescription(e.target.value)}
-                  placeholder="Describe el reto con mas detalle..."
-                />
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-                  Tu pareja decidira cuantos venus te costara (1-7)
-                </Typography>
-              </Box>
+            {wizardMode ? (
+              // Challenge wizard with all 3 types
+              <ChallengeWizard
+                onSubmit={handleWizardSubmit}
+                onCancel={closeDialog}
+                disabled={isSubmitting || !period}
+              />
             ) : (
               // Card selection or custom option
               <>
                 <Button
                   variant="outlined"
                   fullWidth
-                  onClick={() => setCustomMode(true)}
+                  onClick={() => setWizardMode(true)}
                   sx={{ mb: 2, mt: 1 }}
                 >
                   Crear reto personalizado
@@ -298,7 +278,7 @@ export default function Proposals() {
                         >
                           <ListItemText
                             primary={card.title}
-                            secondary={`${card.category} | ${card.credit_value} venus sugeridos`}
+                            secondary={STRINGS.cardLibrary.currencySuggested(card.category, card.credit_value)}
                           />
                         </ListItemButton>
                       </ListItem>
@@ -308,21 +288,6 @@ export default function Proposals() {
               </>
             )}
           </DialogContent>
-          <DialogActions>
-            {customMode && (
-              <Button onClick={() => setCustomMode(false)}>Volver</Button>
-            )}
-            <Button onClick={closeDialog}>Cancelar</Button>
-            {customMode && (
-              <Button
-                variant="contained"
-                onClick={handleProposeCustom}
-                disabled={!period || !customTitle.trim()}
-              >
-                Enviar Reto
-              </Button>
-            )}
-          </DialogActions>
         </Dialog>
 
         {/* Snackbar */}

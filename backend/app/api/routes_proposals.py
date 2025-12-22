@@ -34,8 +34,18 @@ def _enrich_proposal(proposal, db) -> ProposalResponse:
         proposed_by_user_id=proposal.proposed_by_user_id,
         proposed_to_user_id=proposal.proposed_to_user_id,
         card_id=proposal.card_id,
+        challenge_type=proposal.challenge_type,
         custom_title=proposal.custom_title,
         custom_description=proposal.custom_description,
+        # Guided challenge fields
+        why_proposing=proposal.why_proposing,
+        boundary=proposal.boundary,
+        # Custom challenge fields
+        location=proposal.location,
+        duration=proposal.duration,
+        boundaries_json=proposal.boundaries_json,
+        reward_type=proposal.reward_type,
+        reward_details=proposal.reward_details,
         credit_cost=proposal.credit_cost,
         status=proposal.status,
         created_at=proposal.created_at,
@@ -67,6 +77,15 @@ def create_proposal(
             card_id=proposal.card_id,
             custom_title=proposal.custom_title,
             custom_description=proposal.custom_description,
+            # Challenge type and guided/custom fields
+            challenge_type=proposal.challenge_type,
+            why_proposing=proposal.why_proposing,
+            boundary=proposal.boundary,
+            location=proposal.location,
+            duration=proposal.duration,
+            boundaries_json=proposal.boundaries_json,
+            reward_type=proposal.reward_type,
+            reward_details=proposal.reward_details,
         )
         return _enrich_proposal(new_proposal, db)
     except ProposalError as e:

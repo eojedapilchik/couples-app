@@ -12,6 +12,7 @@ from app.schemas.card import (
     VoteRequest,
     VoteResponse,
     PreferenceVoteResponse,
+    PartnerVotesResponse,
 )
 from app.services.card_service import CardService
 
@@ -44,6 +45,44 @@ def get_cards(
         cards = [CardResponse.model_validate(c) for c in cards_orm]
 
     return CardListResponse(cards=cards, total=total)
+
+
+# Specific routes BEFORE /{card_id} to avoid route conflicts
+@router.get("/partner-votes", response_model=PartnerVotesResponse)
+def get_partner_votes_grouped(
+    user_id: int = Query(..., description="Current user ID"),
+    partner_id: int = Query(..., description="Partner user ID"),
+    db: Session = Depends(get_db),
+):
+    """Get partner's votes on mutual cards, grouped by preference type."""
+    result = CardService.get_partner_votes_grouped(db, user_id, partner_id)
+
+    # Convert dicts to CardResponse objects
+    like_cards = [CardResponse(**c) for c in result["like"]]
+    maybe_cards = [CardResponse(**c) for c in result["maybe"]]
+    dislike_cards = [CardResponse(**c) for c in result["dislike"]]
+    neutral_cards = [CardResponse(**c) for c in result["neutral"]]
+
+    total_mutual = len(like_cards) + len(maybe_cards) + len(dislike_cards) + len(neutral_cards)
+
+    return PartnerVotesResponse(
+        like=like_cards,
+        maybe=maybe_cards,
+        dislike=dislike_cards,
+        neutral=neutral_cards,
+        total_mutual=total_mutual,
+    )
+
+
+@router.get("/liked/both", response_model=list[CardResponse])
+def get_cards_liked_by_both(
+    user1_id: int = Query(...),
+    user2_id: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    """Get cards liked by both users."""
+    cards = CardService.get_liked_by_both(db, user1_id, user2_id)
+    return [CardResponse.model_validate(c) for c in cards]
 
 
 @router.get("/{card_id}", response_model=CardResponse)
@@ -103,17 +142,6 @@ def get_card_preferences(card_id: int, db: Session = Depends(get_db)):
 
     votes = CardService.get_votes_for_card(db, card_id)
     return [PreferenceVoteResponse.model_validate(v) for v in votes]
-
-
-@router.get("/liked/both", response_model=list[CardResponse])
-def get_cards_liked_by_both(
-    user1_id: int = Query(...),
-    user2_id: int = Query(...),
-    db: Session = Depends(get_db),
-):
-    """Get cards liked by both users."""
-    cards = CardService.get_liked_by_both(db, user1_id, user2_id)
-    return [CardResponse.model_validate(c) for c in cards]
 
 
 @router.delete("/{card_id}", response_model=CardResponse)

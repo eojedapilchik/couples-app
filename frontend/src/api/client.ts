@@ -19,6 +19,7 @@ import type {
   CreditBalance,
   CreditLedgerListResponse,
   PreferenceType,
+  PartnerVotesResponse,
   AdminResetResponse,
 } from './types';
 
@@ -86,6 +87,15 @@ export const cardsApi = {
   getLikedByBoth: async (user1Id: number, user2Id: number): Promise<Card[]> => {
     const { data } = await api.get('/cards/liked/both', {
       params: { user1_id: user1Id, user2_id: user2Id },
+    });
+    return data;
+  },
+  getPartnerVotesGrouped: async (
+    userId: number,
+    partnerId: number
+  ): Promise<PartnerVotesResponse> => {
+    const { data } = await api.get('/cards/partner-votes', {
+      params: { user_id: userId, partner_id: partnerId },
     });
     return data;
   },

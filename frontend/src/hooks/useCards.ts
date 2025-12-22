@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Card, CardCategory, PreferenceType } from '../api/types';
+import type { Card, CardCategory, PreferenceType, PartnerVotesResponse } from '../api/types';
 import { cardsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
@@ -88,4 +88,41 @@ export function useLikedByBoth() {
   }, [user, partner]);
 
   return { cards, isLoading, error };
+}
+
+export function usePartnerVotes() {
+  const { user, partner } = useAuth();
+  const [data, setData] = useState<PartnerVotesResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPartnerVotes = useCallback(async () => {
+    if (!user || !partner) return;
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await cardsApi.getPartnerVotesGrouped(user.id, partner.id);
+      setData(response);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar votos');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, partner]);
+
+  useEffect(() => {
+    fetchPartnerVotes();
+  }, [fetchPartnerVotes]);
+
+  return {
+    like: data?.like ?? [],
+    maybe: data?.maybe ?? [],
+    dislike: data?.dislike ?? [],
+    neutral: data?.neutral ?? [],
+    totalMutual: data?.total_mutual ?? 0,
+    isLoading,
+    error,
+    refetch: fetchPartnerVotes,
+  };
 }

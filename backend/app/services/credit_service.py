@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.models.credit import CreditBalance, CreditLedger, LedgerType
 from app.models.user import User
+from app.config import CURRENCY_NAME
 
 
 class CreditService:
@@ -68,7 +69,7 @@ class CreditService:
             user_id=user_id,
             ledger_type=LedgerType.INITIAL_GRANT,
             amount=amount,
-            note="Creditos iniciales",
+            note=f"{CURRENCY_NAME} iniciales",
         )
 
     @staticmethod
@@ -82,7 +83,7 @@ class CreditService:
             ledger_type=LedgerType.WEEKLY_BASE_GRANT,
             amount=amount,
             period_id=period_id,
-            note="Creditos semanales",
+            note=f"{CURRENCY_NAME} semanales",
         )
 
     @staticmethod

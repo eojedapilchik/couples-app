@@ -7,6 +7,7 @@ import {
 } from '@mui/icons-material';
 import type { Card, CardCategory } from '../api/types';
 import { getCategoryColor } from '../theme/theme';
+import { CURRENCY_NAME_LOWER } from '../config';
 
 interface GameCardProps {
   card: Card;
@@ -187,7 +188,7 @@ export default function GameCard({
                 opacity: 0.9,
               }}
             >
-              créditos
+              {CURRENCY_NAME_LOWER}
             </Typography>
           </Box>
 

@@ -18,14 +18,17 @@ import {
 import {
   HowToVote as VoteIcon,
   Visibility as BrowseIcon,
+  People as PeopleIcon,
 } from '@mui/icons-material';
 import MobileLayout from '../components/layout/MobileLayout';
 import SwipeableCardStack from '../components/SwipeableCardStack';
+import PartnerVotesView from '../components/PartnerVotesView';
 import { useCards } from '../hooks/useCards';
 import { useProposals } from '../hooks/useProposals';
 import { useActivePeriod } from '../hooks/usePeriods';
 import { useAuth } from '../context/AuthContext';
 import type { CardCategory, PreferenceType, Card } from '../api/types';
+import { STRINGS } from '../config';
 
 const categories: { value: CardCategory | 'all'; label: string }[] = [
   { value: 'all', label: 'Todas' },
@@ -37,7 +40,7 @@ const categories: { value: CardCategory | 'all'; label: string }[] = [
 
 export default function CardLibrary() {
   const [category, setCategory] = useState<CardCategory | 'all'>('all');
-  const [viewMode, setViewMode] = useState<'vote' | 'browse'>('vote');
+  const [viewMode, setViewMode] = useState<'vote' | 'browse' | 'partner'>('vote');
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string }>({
     open: false,
     message: '',
@@ -80,7 +83,7 @@ export default function CardLibrary() {
     setCategory(newValue);
   };
 
-  const handleModeChange = (_: unknown, newMode: 'vote' | 'browse' | null) => {
+  const handleModeChange = (_: unknown, newMode: 'vote' | 'browse' | 'partner' | null) => {
     if (newMode) {
       setViewMode(newMode);
     }
@@ -137,45 +140,58 @@ export default function CardLibrary() {
               <BrowseIcon sx={{ mr: 0.5 }} />
               Ver Todas
             </ToggleButton>
+            <ToggleButton value="partner">
+              <PeopleIcon sx={{ mr: 0.5 }} />
+              Pareja
+            </ToggleButton>
           </ToggleButtonGroup>
         </Box>
 
-        {/* Category Tabs */}
-        <Tabs
-          value={category}
-          onChange={handleCategoryChange}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{ mb: 1, flexShrink: 0 }}
-        >
-          {categories.map((cat) => (
-            <Tab key={cat.value} value={cat.value} label={cat.label} />
-          ))}
-        </Tabs>
+        {/* Category Tabs - hidden in partner mode */}
+        {viewMode !== 'partner' && (
+          <Tabs
+            value={category}
+            onChange={handleCategoryChange}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{ mb: 1, flexShrink: 0 }}
+          >
+            {categories.map((cat) => (
+              <Tab key={cat.value} value={cat.value} label={cat.label} />
+            ))}
+          </Tabs>
+        )}
 
-        {/* Loading */}
-        {isLoading && (
+        {/* Partner Votes View */}
+        {viewMode === 'partner' && (
+          <Box sx={{ flexGrow: 1, overflow: 'auto', px: 1 }}>
+            <PartnerVotesView />
+          </Box>
+        )}
+
+        {/* Loading - for vote/browse modes */}
+        {viewMode !== 'partner' && isLoading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4, flexGrow: 1 }}>
             <CircularProgress />
           </Box>
         )}
 
-        {/* Error */}
-        {error && (
+        {/* Error - for vote/browse modes */}
+        {viewMode !== 'partner' && error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
           </Alert>
         )}
 
-        {/* Swipeable Card Stack */}
-        {!isLoading && !error && (
+        {/* Swipeable Card Stack - for vote/browse modes */}
+        {viewMode !== 'partner' && !isLoading && !error && (
           <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
             <SwipeableCardStack
               key={`${category}-${viewMode}`}
               cards={cards}
               onVote={handleVote}
               onComplete={handleComplete}
-              mode={viewMode}
+              mode={viewMode === 'vote' ? 'vote' : 'browse'}
               onProposeReto={handleProposeReto}
             />
           </Box>
@@ -192,7 +208,7 @@ export default function CardLibrary() {
               Enviar "{proposeDialog.card?.title}" como reto a {partner?.name || 'tu pareja'}?
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Tu pareja decidira cuantos venus te costara (1-7)
+              {STRINGS.currency.partnerWillDecide}
             </Typography>
           </DialogContent>
           <DialogActions>

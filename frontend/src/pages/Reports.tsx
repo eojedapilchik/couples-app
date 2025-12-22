@@ -7,13 +7,14 @@ import MobileLayout from '../components/layout/MobileLayout';
 import { useCreditLedger } from '../hooks/useCredits';
 import { useProposals } from '../hooks/useProposals';
 import type { LedgerType } from '../api/types';
+import { STRINGS, CURRENCY_NAME } from '../config';
 
 const ledgerTypeLabels: Record<LedgerType, string> = {
-  weekly_base_grant: 'Creditos semanales',
-  proposal_cost: 'Costo de propuesta',
-  completion_reward: 'Recompensa por completar',
+  weekly_base_grant: STRINGS.reports.ledgerTypes.weekly_base_grant,
+  proposal_cost: STRINGS.reports.ledgerTypes.proposal_cost,
+  completion_reward: STRINGS.reports.ledgerTypes.completion_reward,
   admin_adjustment: 'Ajuste admin',
-  initial_grant: 'Creditos iniciales',
+  initial_grant: STRINGS.reports.ledgerTypes.initial_grant,
 };
 
 export default function Reports() {
@@ -39,7 +40,7 @@ export default function Reports() {
               Balance Actual
             </Typography>
             <Typography variant="h3" fontWeight={700}>
-              {currentBalance} cr
+              {currentBalance} {CURRENCY_NAME}
             </Typography>
           </CardContent>
         </Card>
@@ -76,7 +77,7 @@ export default function Reports() {
 
         {/* Ledger History */}
         <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
-          Historial de Creditos
+          {STRINGS.reports.currencyHistory}
         </Typography>
 
         {ledgerLoading ? (
