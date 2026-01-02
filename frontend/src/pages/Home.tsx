@@ -11,6 +11,7 @@ import {
   Event as PeriodIcon,
   Inbox as ProposalsIcon,
   Add as AddIcon,
+  AdminPanelSettings as AdminIcon,
 } from '@mui/icons-material';
 import VenusIcon from '../components/VenusIcon';
 import { useNavigate } from 'react-router-dom';
@@ -143,10 +144,27 @@ export default function Home() {
           </Button>
           <Button
             variant="outlined"
+            startIcon={<PeriodIcon />}
+            onClick={() => navigate('/period')}
+          >
+            Ver Periodos
+          </Button>
+          <Button
+            variant="outlined"
             onClick={() => navigate('/proposals')}
           >
             Ver Retos
           </Button>
+          {user?.is_admin && (
+            <Button
+              variant="outlined"
+              color="warning"
+              startIcon={<AdminIcon />}
+              onClick={() => navigate('/admin/cards')}
+            >
+              Admin Cartas
+            </Button>
+          )}
         </Box>
       </Box>
     </MobileLayout>

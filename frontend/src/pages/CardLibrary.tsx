@@ -1,8 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Box,
-  Tabs,
-  Tab,
   CircularProgress,
   Alert,
   Snackbar,
@@ -14,33 +12,30 @@ import {
   DialogActions,
   Button,
   Typography,
+  IconButton,
 } from '@mui/material';
 import {
   HowToVote as VoteIcon,
-  Visibility as BrowseIcon,
   People as PeopleIcon,
+  ArrowBack as BackIcon,
+  LibraryBooks as LibraryIcon,
 } from '@mui/icons-material';
 import MobileLayout from '../components/layout/MobileLayout';
 import SwipeableCardStack from '../components/SwipeableCardStack';
 import PartnerVotesView from '../components/PartnerVotesView';
-import { useCards } from '../hooks/useCards';
+import VotedCardsView from '../components/VotedCardsView';
+import CategoryGrid, { type CategoryDefinition } from '../components/CategoryGrid';
+import { useCards, useCategoryCounts } from '../hooks/useCards';
 import { useProposals } from '../hooks/useProposals';
 import { useActivePeriod } from '../hooks/usePeriods';
 import { useAuth } from '../context/AuthContext';
-import type { CardCategory, PreferenceType, Card } from '../api/types';
+import type { PreferenceType, Card } from '../api/types';
 import { STRINGS } from '../config';
-
-const categories: { value: CardCategory | 'all'; label: string }[] = [
-  { value: 'all', label: 'Todas' },
-  { value: 'calientes', label: 'Calientes' },
-  { value: 'romance', label: 'Romance' },
-  { value: 'risas', label: 'Risas' },
-  { value: 'otras', label: 'Otras' },
-];
+import { buildFilterParams } from '../config/categories';
 
 export default function CardLibrary() {
-  const [category, setCategory] = useState<CardCategory | 'all'>('all');
-  const [viewMode, setViewMode] = useState<'vote' | 'browse' | 'partner'>('vote');
+  const [viewMode, setViewMode] = useState<'vote' | 'library' | 'partner'>('vote');
+  const [selectedCategory, setSelectedCategory] = useState<CategoryDefinition | null>(null);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string }>({
     open: false,
     message: '',
@@ -54,11 +49,28 @@ export default function CardLibrary() {
   const { period } = useActivePeriod();
   const { createProposal } = useProposals();
 
-  // In vote mode, only show unvoted cards; in browse mode, show all
-  const { cards, isLoading, error, voteOnCard } = useCards(
-    category === 'all' ? undefined : category,
-    viewMode === 'vote' // unvotedOnly
-  );
+  // Get category counts for filtering
+  const {
+    counts: categoryCounts,
+    categoriesWithCards,
+    isLoading: countsLoading,
+    refetch: refetchCategoryCounts,
+  } = useCategoryCounts();
+
+  // Build filter params from selected category
+  const filterParams = useMemo(() => {
+    if (!selectedCategory) return { category: undefined, tags: undefined, excludeTags: undefined, intensity: undefined };
+    return buildFilterParams(selectedCategory.filter);
+  }, [selectedCategory]);
+
+  // Fetch cards only when a category is selected
+  const { cards, isLoading, error, voteOnCard } = useCards({
+    category: filterParams.category,
+    tags: filterParams.tags,
+    excludeTags: filterParams.excludeTags,
+    intensity: filterParams.intensity,
+    unvotedOnly: true,
+  });
 
   const handleVote = async (cardId: number, preference: PreferenceType) => {
     try {
@@ -76,17 +88,27 @@ export default function CardLibrary() {
   };
 
   const handleComplete = () => {
-    setSnackbar({ open: true, message: 'Has visto todas las cartas!' });
+    setSnackbar({ open: true, message: 'Has votado todas las cartas de esta categoria!' });
+    // Go back to category grid after completing
+    setTimeout(() => {
+      setSelectedCategory(null);
+      refetchCategoryCounts();
+    }, 1500);
   };
 
-  const handleCategoryChange = (_: unknown, newValue: CardCategory | 'all') => {
-    setCategory(newValue);
-  };
-
-  const handleModeChange = (_: unknown, newMode: 'vote' | 'browse' | 'partner' | null) => {
+  const handleModeChange = (_: unknown, newMode: 'vote' | 'library' | 'partner' | null) => {
     if (newMode) {
       setViewMode(newMode);
+      setSelectedCategory(null); // Reset selection when changing modes
     }
+  };
+
+  const handleSelectCategory = (category: CategoryDefinition) => {
+    setSelectedCategory(category);
+  };
+
+  const handleBackToGrid = () => {
+    setSelectedCategory(null);
   };
 
   const handleProposeReto = (card: Card) => {
@@ -121,45 +143,79 @@ export default function CardLibrary() {
     }
   };
 
-  return (
-    <MobileLayout title="Cartas">
-      <Box sx={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column' }}>
-        {/* Mode Toggle */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
-          <ToggleButtonGroup
-            value={viewMode}
-            exclusive
-            onChange={handleModeChange}
-            size="small"
-          >
-            <ToggleButton value="vote">
-              <VoteIcon sx={{ mr: 0.5 }} />
-              Votar
-            </ToggleButton>
-            <ToggleButton value="browse">
-              <BrowseIcon sx={{ mr: 0.5 }} />
-              Ver Todas
-            </ToggleButton>
-            <ToggleButton value="partner">
-              <PeopleIcon sx={{ mr: 0.5 }} />
-              Pareja
-            </ToggleButton>
-          </ToggleButtonGroup>
-        </Box>
+  // Determine title based on state
+  const getTitle = () => {
+    if (viewMode === 'partner') return 'Votos Pareja';
+    if (viewMode === 'library') return 'Mis Cartas';
+    if (selectedCategory) return selectedCategory.label;
+    return 'Cartas';
+  };
 
-        {/* Category Tabs - hidden in partner mode */}
-        {viewMode !== 'partner' && (
-          <Tabs
-            value={category}
-            onChange={handleCategoryChange}
-            variant="scrollable"
-            scrollButtons="auto"
-            sx={{ mb: 1, flexShrink: 0 }}
-          >
-            {categories.map((cat) => (
-              <Tab key={cat.value} value={cat.value} label={cat.label} />
-            ))}
-          </Tabs>
+  return (
+    <MobileLayout title={getTitle()}>
+      <Box sx={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column' }}>
+        {/* Header with back button when in voting mode */}
+        {selectedCategory && viewMode === 'vote' && (
+          <Box sx={{ display: 'flex', alignItems: 'center', px: 1, mb: 1 }}>
+            <IconButton onClick={handleBackToGrid} size="small">
+              <BackIcon />
+            </IconButton>
+            <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+              {cards.length} cartas sin votar
+            </Typography>
+          </Box>
+        )}
+
+        {/* Mode Toggle - only show when not in voting mode */}
+        {!selectedCategory && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
+            <ToggleButtonGroup
+              value={viewMode}
+              exclusive
+              onChange={handleModeChange}
+              size="small"
+            >
+              <ToggleButton value="vote">
+                <VoteIcon sx={{ mr: 0.5, fontSize: '1rem' }} />
+                Votar
+              </ToggleButton>
+              <ToggleButton value="library">
+                <LibraryIcon sx={{ mr: 0.5, fontSize: '1rem' }} />
+                Mis Cartas
+              </ToggleButton>
+              <ToggleButton value="partner">
+                <PeopleIcon sx={{ mr: 0.5, fontSize: '1rem' }} />
+                Pareja
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+        )}
+
+        {/* Category Grid - shown in vote mode without selection */}
+        {viewMode === 'vote' && !selectedCategory && (
+          <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+            {countsLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <CategoryGrid
+                onSelectCategory={handleSelectCategory}
+                categories={categoriesWithCards}
+                unvotedCounts={categoryCounts}
+              />
+            )}
+          </Box>
+        )}
+
+        {/* Library View - browse voted cards grouped by category */}
+        {viewMode === 'library' && (
+          <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+            <VotedCardsView
+              onProposeReto={handleProposeReto}
+              onUndoVote={refetchCategoryCounts}
+            />
+          </Box>
         )}
 
         {/* Partner Votes View */}
@@ -169,29 +225,29 @@ export default function CardLibrary() {
           </Box>
         )}
 
-        {/* Loading - for vote/browse modes */}
-        {viewMode !== 'partner' && isLoading && (
+        {/* Loading - when category selected */}
+        {viewMode === 'vote' && selectedCategory && isLoading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4, flexGrow: 1 }}>
             <CircularProgress />
           </Box>
         )}
 
-        {/* Error - for vote/browse modes */}
-        {viewMode !== 'partner' && error && (
+        {/* Error */}
+        {viewMode === 'vote' && selectedCategory && error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
           </Alert>
         )}
 
-        {/* Swipeable Card Stack - for vote/browse modes */}
-        {viewMode !== 'partner' && !isLoading && !error && (
+        {/* Swipeable Card Stack - when category selected */}
+        {viewMode === 'vote' && selectedCategory && !isLoading && !error && (
           <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
             <SwipeableCardStack
-              key={`${category}-${viewMode}`}
+              key={selectedCategory.id}
               cards={cards}
               onVote={handleVote}
               onComplete={handleComplete}
-              mode={viewMode === 'vote' ? 'vote' : 'browse'}
+              mode="vote"
               onProposeReto={handleProposeReto}
             />
           </Box>

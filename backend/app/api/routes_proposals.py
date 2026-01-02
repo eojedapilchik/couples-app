@@ -7,6 +7,7 @@ from app.database import get_db
 from app.models.proposal import ProposalStatus
 from app.schemas.proposal import (
     ProposalCreate,
+    ProposalUpdate,
     ProposalResponse,
     ProposalRespondRequest,
     ProposalListResponse,
@@ -118,6 +119,34 @@ def get_proposal(proposal_id: int, db: Session = Depends(get_db)):
     if not proposal:
         raise HTTPException(status_code=404, detail="Propuesta no encontrada")
     return _enrich_proposal(proposal, db)
+
+
+@router.patch("/{proposal_id}", response_model=ProposalResponse)
+def update_proposal(
+    proposal_id: int,
+    request: ProposalUpdate,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    """Update a proposal before it is accepted."""
+    try:
+        proposal = ProposalService.update_proposal(db, proposal_id, user_id, request)
+        return _enrich_proposal(proposal, db)
+    except ProposalError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/{proposal_id}", status_code=204)
+def delete_proposal(
+    proposal_id: int,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    """Delete a proposal before it is accepted."""
+    try:
+        ProposalService.delete_proposal(db, proposal_id, user_id)
+    except ProposalError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.patch("/{proposal_id}/respond", response_model=ProposalResponse)

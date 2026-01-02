@@ -8,11 +8,14 @@ import type {
   CardListResponse,
   VoteRequest,
   CardCategory,
+  Tag,
+  TagsGroupedResponse,
   Period,
   PeriodCreate,
   PeriodListResponse,
   Proposal,
   ProposalCreate,
+  ProposalUpdate,
   ProposalRespondRequest,
   ProposalListResponse,
   ProposalStatus,
@@ -21,6 +24,9 @@ import type {
   PreferenceType,
   PartnerVotesResponse,
   AdminResetResponse,
+  CardContentUpdate,
+  CardContentResponse,
+  CardCreateAdmin,
 } from './types';
 
 // API base URL - use proxy in dev, direct in production
@@ -37,7 +43,18 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message = error.response?.data?.detail || 'Error de conexion';
+    const detail = error.response?.data?.detail;
+    let message = 'Error de conexion';
+    if (typeof detail === 'string') {
+      message = detail;
+    } else if (Array.isArray(detail)) {
+      message = detail
+        .map((item) => (typeof item === 'string' ? item : item?.msg || item?.message))
+        .filter(Boolean)
+        .join(', ') || message;
+    } else if (detail) {
+      message = JSON.stringify(detail);
+    }
     return Promise.reject(new Error(message));
   }
 );
@@ -54,17 +71,41 @@ export const authApi = {
   },
 };
 
+// Tags
+export const tagsApi = {
+  getTags: async (tagType?: string): Promise<Tag[]> => {
+    const { data } = await api.get('/tags', { params: { tag_type: tagType } });
+    return data;
+  },
+  getTagsGrouped: async (): Promise<TagsGroupedResponse> => {
+    const { data } = await api.get('/tags/grouped');
+    return data;
+  },
+};
+
 // Cards
 export const cardsApi = {
   getCards: async (params?: {
     category?: CardCategory;
     user_id?: number;
     partner_id?: number;
+    tags?: string[];
+    exclude_tags?: string[];
     unvoted_only?: boolean;
+    voted_only?: boolean;
+    locale?: string;
     limit?: number;
     offset?: number;
   }): Promise<CardListResponse> => {
-    const { data } = await api.get('/cards', { params });
+    // Convert arrays to comma-separated strings for the API
+    const queryParams: Record<string, unknown> = { ...params };
+    if (params?.tags?.length) {
+      queryParams.tags = params.tags.join(',');
+    }
+    if (params?.exclude_tags?.length) {
+      queryParams.exclude_tags = params.exclude_tags.join(',');
+    }
+    const { data } = await api.get('/cards', { params: queryParams });
     return data;
   },
   getCard: async (cardId: number): Promise<Card> => {
@@ -84,6 +125,14 @@ export const cardsApi = {
       params: { user_id: userId },
     });
   },
+  deleteVote: async (
+    cardId: number,
+    userId: number
+  ): Promise<void> => {
+    await api.delete(`/cards/${cardId}/vote`, {
+      params: { user_id: userId },
+    });
+  },
   getLikedByBoth: async (user1Id: number, user2Id: number): Promise<Card[]> => {
     const { data } = await api.get('/cards/liked/both', {
       params: { user1_id: user1Id, user2_id: user2Id },
@@ -92,10 +141,90 @@ export const cardsApi = {
   },
   getPartnerVotesGrouped: async (
     userId: number,
-    partnerId: number
+    partnerId: number,
+    locale?: string
   ): Promise<PartnerVotesResponse> => {
     const { data } = await api.get('/cards/partner-votes', {
-      params: { user_id: userId, partner_id: partnerId },
+      params: { user_id: userId, partner_id: partnerId, locale },
+    });
+    return data;
+  },
+
+  // Admin methods
+  getAllCardsForAdmin: async (
+    userId: number,
+    params?: { include_disabled?: boolean; limit?: number; offset?: number }
+  ): Promise<CardListResponse> => {
+    const { data } = await api.get('/cards/admin/all', {
+      params: { user_id: userId, ...params },
+    });
+    return data;
+  },
+
+  toggleCardEnabled: async (
+    cardId: number,
+    enabled: boolean,
+    userId: number
+  ): Promise<{ id: number; is_enabled: boolean; message: string }> => {
+    const { data } = await api.patch(`/cards/${cardId}/toggle`, null, {
+      params: { enabled, user_id: userId },
+    });
+    return data;
+  },
+
+  bulkToggleCards: async (
+    cardIds: number[],
+    enabled: boolean,
+    userId: number
+  ): Promise<{ updated_count: number; is_enabled: boolean }> => {
+    const { data } = await api.patch('/cards/admin/bulk-toggle', null, {
+      params: { card_ids: cardIds, enabled, user_id: userId },
+    });
+    return data;
+  },
+
+  updateCardTags: async (
+    cardId: number,
+    tags: string[],
+    intensity: string,
+    userId: number
+  ): Promise<Card> => {
+    const { data } = await api.patch(
+      `/cards/${cardId}/tags`,
+      { tags, intensity },
+      { params: { user_id: userId } }
+    );
+    return data;
+  },
+
+  getCardContent: async (
+    cardId: number,
+    locale: string,
+    userId: number
+  ): Promise<CardContentResponse> => {
+    const { data } = await api.get(`/cards/${cardId}/content`, {
+      params: { locale, user_id: userId },
+    });
+    return data;
+  },
+
+  updateCardContent: async (
+    cardId: number,
+    content: CardContentUpdate,
+    userId: number
+  ): Promise<{ id: number; locale: string; message: string }> => {
+    const { data } = await api.patch(`/cards/${cardId}/content`, content, {
+      params: { user_id: userId },
+    });
+    return data;
+  },
+
+  createCardAdmin: async (
+    cardData: CardCreateAdmin,
+    userId: number
+  ): Promise<Card> => {
+    const { data } = await api.post('/cards/admin/create', cardData, {
+      params: { user_id: userId },
     });
     return data;
   },
@@ -164,6 +293,21 @@ export const proposalsApi = {
       params: { user_id: userId },
     });
     return data;
+  },
+  updateProposal: async (
+    proposalId: number,
+    proposal: ProposalUpdate,
+    userId: number
+  ): Promise<Proposal> => {
+    const { data } = await api.patch(`/proposals/${proposalId}`, proposal, {
+      params: { user_id: userId },
+    });
+    return data;
+  },
+  deleteProposal: async (proposalId: number, userId: number): Promise<void> => {
+    await api.delete(`/proposals/${proposalId}`, {
+      params: { user_id: userId },
+    });
   },
   respondToProposal: async (
     proposalId: number,

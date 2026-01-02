@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -11,14 +11,17 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogActions,
   Button,
   List,
   ListItem,
   ListItemButton,
   ListItemText,
   Divider,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon, Search as SearchIcon } from '@mui/icons-material';
 import MobileLayout from '../components/layout/MobileLayout';
 import ProposalCard from '../components/ProposalCard';
 import ChallengeWizard from '../components/ChallengeWizard';
@@ -26,16 +29,22 @@ import { useProposals } from '../hooks/useProposals';
 import { useLikedByBoth } from '../hooks/useCards';
 import { useActivePeriod } from '../hooks/usePeriods';
 import { useAuth } from '../context/AuthContext';
-import type { ProposalStatus, Card, ProposalCreate } from '../api/types';
+import type { ProposalStatus, Card, Proposal, ProposalCreate, ProposalUpdate } from '../api/types';
 import { STRINGS } from '../config';
 
 export default function Proposals() {
-  const { partner } = useAuth();
+  const { partner, user } = useAuth();
   const [tab, setTab] = useState<'received' | 'sent'>('received');
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
   const [proposeDialog, setProposeDialog] = useState(false);
   const [wizardMode, setWizardMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cardSearch, setCardSearch] = useState('');
+  const [editDialog, setEditDialog] = useState(false);
+  const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState(false);
+  const [deletingProposal, setDeletingProposal] = useState<Proposal | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   const {
     proposals,
@@ -45,11 +54,24 @@ export default function Proposals() {
     markComplete,
     confirmCompletion,
     createProposal,
+    updateProposal,
+    deleteProposal,
     refetch,
   } = useProposals(tab === 'received');
 
   const { cards: likedCards, isLoading: cardsLoading } = useLikedByBoth();
   const { period } = useActivePeriod();
+
+  // Filter cards by search query
+  const filteredCards = useMemo(() => {
+    if (!cardSearch.trim()) return likedCards;
+    const query = cardSearch.toLowerCase().trim();
+    return likedCards.filter(
+      (card) =>
+        card.title?.toLowerCase().includes(query) ||
+        card.description?.toLowerCase().includes(query)
+    );
+  }, [likedCards, cardSearch]);
 
   const handleRespond = async (
     proposalId: number,
@@ -154,9 +176,53 @@ export default function Proposals() {
     }
   };
 
+  const openEditDialog = (proposal: Proposal) => {
+    setEditingProposal(proposal);
+    setEditDialog(true);
+  };
+
+  const handleEditSubmit = async (data: Partial<ProposalCreate>) => {
+    if (!editingProposal) return;
+    setIsEditing(true);
+    try {
+      await updateProposal(editingProposal.id, data as ProposalUpdate);
+      setSnackbar({ open: true, message: 'Reto actualizado!' });
+      setEditDialog(false);
+      setEditingProposal(null);
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Error al actualizar reto',
+      });
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
+  const openDeleteDialog = (proposal: Proposal) => {
+    setDeletingProposal(proposal);
+    setDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingProposal) return;
+    try {
+      await deleteProposal(deletingProposal.id);
+      setSnackbar({ open: true, message: 'Reto eliminado' });
+      setDeleteDialog(false);
+      setDeletingProposal(null);
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Error al eliminar reto',
+      });
+    }
+  };
+
   const closeDialog = () => {
     setProposeDialog(false);
     setWizardMode(false);
+    setCardSearch('');
   };
 
   return (
@@ -200,9 +266,12 @@ export default function Proposals() {
                   key={proposal.id}
                   proposal={proposal}
                   isRecipient={tab === 'received'}
+                  currentUserId={user?.id}
                   onRespond={handleRespond}
                   onMarkComplete={() => handleMarkComplete(proposal.id)}
                   onConfirmCompletion={() => handleConfirm(proposal.id)}
+                  onEdit={() => openEditDialog(proposal)}
+                  onDelete={() => openDeleteDialog(proposal)}
                 />
               ))
             )}
@@ -269,25 +338,105 @@ export default function Proposals() {
                     Voten en las cartas primero!
                   </Typography>
                 ) : (
-                  <List sx={{ maxHeight: 300, overflow: 'auto' }}>
-                    {likedCards.map((card) => (
-                      <ListItem key={card.id} disablePadding>
-                        <ListItemButton
-                          onClick={() => handleProposeCard(card)}
-                          disabled={!period}
-                        >
-                          <ListItemText
-                            primary={card.title}
-                            secondary={STRINGS.cardLibrary.currencySuggested(card.category, card.credit_value)}
-                          />
-                        </ListItemButton>
-                      </ListItem>
-                    ))}
-                  </List>
+                  <>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="Buscar cartas..."
+                      value={cardSearch}
+                      onChange={(e) => setCardSearch(e.target.value)}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchIcon fontSize="small" color="action" />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ mb: 1 }}
+                    />
+                    <List sx={{ maxHeight: 250, overflow: 'auto' }}>
+                      {filteredCards.length === 0 ? (
+                        <Typography color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                          No hay resultados para "{cardSearch}"
+                        </Typography>
+                      ) : (
+                        filteredCards.map((card) => (
+                          <ListItem key={card.id} disablePadding>
+                            <ListItemButton
+                              onClick={() => handleProposeCard(card)}
+                              disabled={!period}
+                            >
+                              <ListItemText
+                                primary={card.title}
+                                secondary={STRINGS.cardLibrary.currencySuggested(card.category, card.credit_value)}
+                              />
+                            </ListItemButton>
+                          </ListItem>
+                        ))
+                      )}
+                    </List>
+                  </>
                 )}
               </>
             )}
           </DialogContent>
+        </Dialog>
+
+        {/* Edit Dialog */}
+        <Dialog
+          open={editDialog}
+          onClose={() => {
+            setEditDialog(false);
+            setEditingProposal(null);
+          }}
+          fullWidth
+          maxWidth="sm"
+        >
+          <DialogTitle>Editar Reto</DialogTitle>
+          <DialogContent>
+            {editingProposal && (
+              <ChallengeWizard
+                onSubmit={handleEditSubmit}
+                onCancel={() => {
+                  setEditDialog(false);
+                  setEditingProposal(null);
+                }}
+                disabled={isEditing}
+                initialData={editingProposal}
+                mode="edit"
+                allowTypeChange={false}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Dialog */}
+        <Dialog
+          open={deleteDialog}
+          onClose={() => {
+            setDeleteDialog(false);
+            setDeletingProposal(null);
+          }}
+        >
+          <DialogTitle>Eliminar reto?</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" color="text.secondary">
+              Esto eliminara el reto antes de que tu pareja lo acepte.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                setDeleteDialog(false);
+                setDeletingProposal(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button color="error" variant="contained" onClick={handleDeleteConfirm}>
+              Eliminar
+            </Button>
+          </DialogActions>
         </Dialog>
 
         {/* Snackbar */}

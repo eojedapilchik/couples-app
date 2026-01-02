@@ -1,13 +1,76 @@
 """Card Service - Card CRUD and voting logic."""
 
 import random
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
-from app.models.card import Card, PreferenceVote, CardCategory, CardStatus, PreferenceType
+from app.models.card import Card, PreferenceVote, CardCategory, CardStatus, PreferenceType, CardTranslation
+from app.models.tag import Tag
+from app.models.user import User
+from app.utils.placeholders import replace_placeholders_in_card
+
+# Default locale (cards are stored in English)
+DEFAULT_LOCALE = "en"
 
 
 class CardService:
     """Card operations and preference voting."""
+
+    @staticmethod
+    def _get_translated_text(
+        db: Session,
+        card: Card,
+        locale: str | None,
+    ) -> tuple[str, str]:
+        """
+        Get translated title and description for a card.
+        Falls back to card's default text (English) if no translation exists.
+        """
+        if not locale or locale == DEFAULT_LOCALE:
+            return card.title, card.description
+
+        # Look for translation
+        translation = db.query(CardTranslation).filter(
+            CardTranslation.card_id == card.id,
+            CardTranslation.locale == locale,
+        ).first()
+
+        if translation:
+            return translation.title, translation.description or card.description
+
+        # Fallback to default
+        return card.title, card.description
+
+    @staticmethod
+    def _build_card_dict(
+        db: Session,
+        card: Card,
+        locale: str | None = None,
+        user_vote: PreferenceVote | None = None,
+        partner_vote: PreferenceVote | None = None,
+        include_tags_list: bool = False,
+    ) -> dict:
+        """Build a card response dict with optional translations and votes."""
+        title, description = CardService._get_translated_text(db, card, locale)
+        card_dict = {
+            "id": card.id,
+            "title": title,
+            "description": description,
+            "category": card.category,
+            "spice_level": card.spice_level,
+            "difficulty_level": card.difficulty_level,
+            "credit_value": card.credit_value,
+            "tags": card.tags,
+            "source": card.source,
+            "status": card.status,
+            "is_enabled": card.is_enabled,
+            "created_by_user_id": card.created_by_user_id,
+            "created_at": card.created_at,
+            "user_preference": user_vote.preference if user_vote else None,
+            "partner_preference": partner_vote.preference if partner_vote else None,
+        }
+        if include_tags_list:
+            card_dict["tags_list"] = CardService._get_card_tags(db, card.id, card)
+        return card_dict
 
     @staticmethod
     def get_cards(
@@ -18,7 +81,10 @@ class CardService:
         offset: int = 0,
     ) -> tuple[list[Card], int]:
         """Get cards with optional filtering."""
-        query = db.query(Card).filter(Card.status == status)
+        query = db.query(Card).filter(
+            Card.status == status,
+            Card.is_enabled == True,
+        )
         if category:
             query = query.filter(Card.category == category)
         total = query.count()
@@ -84,6 +150,21 @@ class CardService:
         return vote
 
     @staticmethod
+    def delete_vote(
+        db: Session, user_id: int, card_id: int
+    ) -> bool:
+        """Delete user's vote on a card."""
+        vote = db.query(PreferenceVote).filter(
+            PreferenceVote.user_id == user_id,
+            PreferenceVote.card_id == card_id,
+        ).first()
+        if not vote:
+            return False
+        db.delete(vote)
+        db.commit()
+        return True
+
+    @staticmethod
     def get_user_vote(
         db: Session, user_id: int, card_id: int
     ) -> PreferenceVote | None:
@@ -103,64 +184,143 @@ class CardService:
         ).all()
 
     @staticmethod
+    def _apply_tag_filters(
+        db: Session,
+        query,
+        tags: list[str] | None = None,
+        exclude_tags: list[str] | None = None,
+    ):
+        """Apply tag filters to a card query using JSON field."""
+        from sqlalchemy import or_, and_, not_
+
+        if tags:
+            # Get cards that have ANY of the specified tags (OR logic)
+            # Check if tag slug appears in the JSON (either in tags array or as intensity)
+            tag_conditions = [Card.tags.like(f'%"{tag}"%') for tag in tags]
+            query = query.filter(or_(*tag_conditions))
+
+        if exclude_tags:
+            # Exclude cards that have ANY of the excluded tags
+            exclude_conditions = [Card.tags.like(f'%"{tag}"%') for tag in exclude_tags]
+            query = query.filter(not_(or_(*exclude_conditions)))
+
+        return query
+
+    @staticmethod
+    def _get_card_tags(db: Session, card_id: int, card: Card | None = None) -> list[dict]:
+        """Get all tags for a card by parsing JSON and looking up in tags table."""
+        import json
+
+        # Get card if not provided
+        if card is None:
+            card = db.query(Card).filter(Card.id == card_id).first()
+        if not card or not card.tags:
+            return []
+
+        # Parse the JSON tags field
+        try:
+            tags_data = json.loads(card.tags)
+        except json.JSONDecodeError:
+            return []
+
+        # Get all tag slugs (tags + intensity)
+        slugs = tags_data.get("tags", [])
+        intensity = tags_data.get("intensity")
+        if intensity and intensity not in slugs:
+            slugs.append(intensity)
+
+        if not slugs:
+            return []
+
+        # Lookup tags in database
+        tags = db.query(Tag).filter(Tag.slug.in_(slugs)).all()
+        return [
+            {
+                "id": tag.id,
+                "slug": tag.slug,
+                "name": tag.name,
+                "tag_type": tag.tag_type,
+                "parent_slug": tag.parent_slug,
+                "display_order": tag.display_order,
+            }
+            for tag in tags
+        ]
+
+    @staticmethod
     def get_cards_with_preferences(
         db: Session,
         user_id: int,
         partner_id: int,
         category: CardCategory | None = None,
+        tags: list[str] | None = None,
+        exclude_tags: list[str] | None = None,
         limit: int = 50,
         offset: int = 0,
         unvoted_only: bool = False,
+        voted_only: bool = False,
+        locale: str | None = None,
     ) -> tuple[list[dict], int]:
         """Get cards with both users' preferences included."""
-        # Build base query
-        query = db.query(Card).filter(Card.status == CardStatus.ACTIVE)
+        # Fetch user and partner for placeholder replacement
+        user = db.query(User).filter(User.id == user_id).first()
+        partner = db.query(User).filter(User.id == partner_id).first()
+
+        # Build base query - only enabled and active cards
+        query = db.query(Card).filter(
+            Card.status == CardStatus.ACTIVE,
+            Card.is_enabled == True
+        )
         if category:
             query = query.filter(Card.category == category)
 
-        # Filter out cards the user has already voted on
+        # Apply tag filters
+        query = CardService._apply_tag_filters(db, query, tags, exclude_tags)
+
+        # Filter based on vote status
+        voted_card_ids = db.query(PreferenceVote.card_id).filter(
+            PreferenceVote.user_id == user_id
+        ).subquery()
+
         if unvoted_only:
-            voted_card_ids = db.query(PreferenceVote.card_id).filter(
-                PreferenceVote.user_id == user_id
-            ).subquery()
+            # Only cards the user hasn't voted on
             query = query.filter(~Card.id.in_(voted_card_ids))
+        elif voted_only:
+            # Only cards the user has voted on
+            query = query.filter(Card.id.in_(voted_card_ids))
 
         total = query.count()
         cards = query.order_by(Card.created_at.desc()).offset(offset).limit(limit).all()
 
-        # Shuffle cards when showing all categories for variety
-        if category is None:
-            cards = list(cards)
-            random.shuffle(cards)
+        # Shuffle cards for variety
+        cards = list(cards)
+        random.shuffle(cards)
 
         result = []
         for card in cards:
             user_vote = CardService.get_user_vote(db, user_id, card.id) if not unvoted_only else None
             partner_vote = CardService.get_user_vote(db, partner_id, card.id)
 
-            card_dict = {
-                "id": card.id,
-                "title": card.title,
-                "description": card.description,
-                "category": card.category,
-                "spice_level": card.spice_level,
-                "difficulty_level": card.difficulty_level,
-                "credit_value": card.credit_value,
-                "tags": card.tags,
-                "source": card.source,
-                "status": card.status,
-                "created_at": card.created_at,
-                "user_preference": user_vote.preference if user_vote else None,
-                "partner_preference": partner_vote.preference if partner_vote else None,
-            }
+            card_dict = CardService._build_card_dict(
+                db,
+                card,
+                locale=locale,
+                user_vote=user_vote,
+                partner_vote=partner_vote,
+                include_tags_list=True,
+            )
+            # Replace placeholders with actual names
+            card_dict = replace_placeholders_in_card(card_dict, user, partner)
             result.append(card_dict)
 
         return result, total
 
     @staticmethod
     def get_liked_by_both(
-        db: Session, user1_id: int, user2_id: int
-    ) -> list[Card]:
+        db: Session,
+        user1_id: int,
+        user2_id: int,
+        locale: str | None = None,
+    ) -> list[dict]:
         """Get cards liked by both users."""
         user1_likes = db.query(PreferenceVote.card_id).filter(
             PreferenceVote.user_id == user1_id,
@@ -172,11 +332,15 @@ class CardService:
             PreferenceVote.preference == PreferenceType.LIKE,
         ).subquery()
 
-        return db.query(Card).filter(
+        cards = db.query(Card).filter(
             Card.id.in_(user1_likes),
             Card.id.in_(user2_likes),
             Card.status == CardStatus.ACTIVE,
         ).all()
+        return [
+            CardService._build_card_dict(db, card, locale=locale)
+            for card in cards
+        ]
 
     @staticmethod
     def archive_card(db: Session, card_id: int) -> Card | None:
@@ -190,13 +354,20 @@ class CardService:
 
     @staticmethod
     def get_partner_votes_grouped(
-        db: Session, user_id: int, partner_id: int
+        db: Session,
+        user_id: int,
+        partner_id: int,
+        locale: str | None = None,
     ) -> dict[str, list[dict]]:
         """
         Get cards where both users have voted, grouped by partner's preference.
         Returns dict with keys: like, maybe, dislike, neutral
         Each card includes both partner's preference and user's own preference.
         """
+        # Fetch user and partner for placeholder replacement
+        user = db.query(User).filter(User.id == user_id).first()
+        partner = db.query(User).filter(User.id == partner_id).first()
+
         # Get all cards where BOTH users have voted
         user_votes = db.query(PreferenceVote.card_id).filter(
             PreferenceVote.user_id == user_id
@@ -219,6 +390,7 @@ class CardService:
             card = db.query(Card).filter(
                 Card.id == partner_vote.card_id,
                 Card.status == CardStatus.ACTIVE,
+                Card.is_enabled == True,
             ).first()
 
             if not card:
@@ -227,21 +399,16 @@ class CardService:
             # Get user's own vote on this card
             user_vote = CardService.get_user_vote(db, user_id, card.id)
 
-            card_dict = {
-                "id": card.id,
-                "title": card.title,
-                "description": card.description,
-                "category": card.category,
-                "spice_level": card.spice_level,
-                "difficulty_level": card.difficulty_level,
-                "credit_value": card.credit_value,
-                "tags": card.tags,
-                "source": card.source,
-                "status": card.status,
-                "created_at": card.created_at,
-                "user_preference": user_vote.preference if user_vote else None,
-                "partner_preference": partner_vote.preference,
-            }
+            card_dict = CardService._build_card_dict(
+                db,
+                card,
+                locale=locale,
+                user_vote=user_vote,
+                partner_vote=partner_vote,
+                include_tags_list=True,
+            )
+            # Replace placeholders with actual names
+            card_dict = replace_placeholders_in_card(card_dict, user, partner)
 
             # Add to appropriate group based on partner's preference
             pref_key = partner_vote.preference.value  # like, maybe, dislike, neutral
@@ -249,3 +416,209 @@ class CardService:
                 result[pref_key].append(card_dict)
 
         return result
+
+    @staticmethod
+    def toggle_card_enabled(db: Session, card_id: int, enabled: bool) -> Card | None:
+        """Toggle a card's enabled status (admin only)."""
+        card = CardService.get_card(db, card_id)
+        if card:
+            card.is_enabled = enabled
+            db.commit()
+            db.refresh(card)
+        return card
+
+    @staticmethod
+    def get_all_cards_for_admin(
+        db: Session,
+        limit: int = 100,
+        offset: int = 0,
+        include_disabled: bool = True,
+        locale: str | None = None,
+    ) -> tuple[list[dict], int]:
+        """Get all cards for admin management, including disabled ones."""
+        query = db.query(Card).filter(Card.status == CardStatus.ACTIVE)
+
+        if not include_disabled:
+            query = query.filter(Card.is_enabled == True)
+
+        total = query.count()
+        cards = query.order_by(Card.id.asc()).offset(offset).limit(limit).all()
+
+        result = []
+        for card in cards:
+            card_dict = CardService._build_card_dict(
+                db,
+                card,
+                locale=locale,
+                include_tags_list=True,
+            )
+            result.append(card_dict)
+
+        return result, total
+
+    @staticmethod
+    def bulk_toggle_cards(db: Session, card_ids: list[int], enabled: bool) -> int:
+        """Bulk enable/disable cards. Returns count of updated cards."""
+        updated = db.query(Card).filter(Card.id.in_(card_ids)).update(
+            {"is_enabled": enabled},
+            synchronize_session=False
+        )
+        db.commit()
+        return updated
+
+    @staticmethod
+    def update_card_tags(
+        db: Session,
+        card_id: int,
+        tags: list[str],
+        intensity: str,
+    ) -> dict | None:
+        """Update a card's tags JSON field."""
+        import json
+        card = CardService.get_card(db, card_id)
+        if not card:
+            return None
+
+        # Build the tags JSON structure
+        tags_data = {
+            "tags": tags,
+            "intensity": intensity,
+        }
+        card.tags = json.dumps(tags_data)
+
+        db.commit()
+        db.refresh(card)
+
+        # Return full card dict with tags_list (parsed from JSON)
+        return CardService._build_card_dict(db, card, locale="es", include_tags_list=True)
+
+    @staticmethod
+    def update_card_content(
+        db: Session,
+        card_id: int,
+        title: str,
+        description: str,
+        locale: str = "en",
+    ) -> Card | None:
+        """Update card title and description. For 'en', updates base card; otherwise updates/creates translation."""
+        card = CardService.get_card(db, card_id)
+        if not card:
+            return None
+
+        if locale == "en":
+            # Update base card
+            card.title = title
+            card.description = description
+        else:
+            # Update or create translation
+            translation = db.query(CardTranslation).filter(
+                CardTranslation.card_id == card_id,
+                CardTranslation.locale == locale,
+            ).first()
+
+            if translation:
+                translation.title = title
+                translation.description = description
+            else:
+                translation = CardTranslation(
+                    card_id=card_id,
+                    locale=locale,
+                    title=title,
+                    description=description,
+                )
+                db.add(translation)
+
+        db.commit()
+        db.refresh(card)
+        return card
+
+    @staticmethod
+    def get_card_content_by_locale(
+        db: Session,
+        card_id: int,
+        locale: str = "en",
+    ) -> dict | None:
+        """Get card title and description for a specific locale."""
+        card = CardService.get_card(db, card_id)
+        if not card:
+            return None
+
+        if locale == "en":
+            return {
+                "title": card.title,
+                "description": card.description,
+                "locale": "en",
+            }
+
+        # Check for translation
+        translation = db.query(CardTranslation).filter(
+            CardTranslation.card_id == card_id,
+            CardTranslation.locale == locale,
+        ).first()
+
+        if translation:
+            return {
+                "title": translation.title,
+                "description": translation.description or card.description,
+                "locale": locale,
+            }
+
+        # Fallback to English
+        return {
+            "title": card.title,
+            "description": card.description,
+            "locale": "en",
+        }
+
+    @staticmethod
+    def create_card_admin(
+        db: Session,
+        title: str,
+        description: str,
+        title_es: str | None,
+        description_es: str | None,
+        tags: list[str],
+        intensity: str,
+        category: CardCategory,
+        spice_level: int,
+        difficulty_level: int,
+        credit_value: int,
+        created_by_user_id: int,
+    ) -> Card:
+        """Create a new card with optional Spanish translation (admin)."""
+        import json
+        from app.models.card import CardSource
+
+        # Build tags JSON
+        tags_data = {
+            "tags": tags + ["user_created"],  # Add user_created tag
+            "intensity": intensity,
+        }
+
+        card = Card(
+            title=title,
+            description=description,
+            category=category,
+            spice_level=spice_level,
+            difficulty_level=difficulty_level,
+            credit_value=credit_value,
+            tags=json.dumps(tags_data),
+            source=CardSource.MANUAL,
+            created_by_user_id=created_by_user_id,
+        )
+        db.add(card)
+        db.flush()  # Get the card ID
+
+        # Add Spanish translation if provided
+        if title_es or description_es:
+            translation = CardTranslation(
+                card_id=card.id,
+                locale="es",
+                title=title_es or title,
+                description=description_es or description,
+            )
+            db.add(translation)
+
+        db.commit()
+        db.refresh(card)
+        return card

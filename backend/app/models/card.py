@@ -52,6 +52,12 @@ class Card(Base):
     status: Mapped[CardStatus] = mapped_column(
         SQLEnum(CardStatus), default=CardStatus.ACTIVE
     )
+    is_enabled: Mapped[bool] = mapped_column(
+        default=True, nullable=False
+    )  # Admin can disable cards
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )  # User who created this card
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )
@@ -61,6 +67,19 @@ class Card(Base):
         "PreferenceVote", back_populates="card"
     )
     proposals: Mapped[list["Proposal"]] = relationship("Proposal", back_populates="card")
+    translations: Mapped[list["CardTranslation"]] = relationship(
+        "CardTranslation", back_populates="card", cascade="all, delete-orphan"
+    )
+    created_by: Mapped["User | None"] = relationship(
+        "User", foreign_keys=[created_by_user_id]
+    )
+
+    def get_translation(self, locale: str) -> "CardTranslation | None":
+        """Get translation for a specific locale."""
+        for t in self.translations:
+            if t.locale == locale:
+                return t
+        return None
 
     def __repr__(self) -> str:
         return f"<Card(id={self.id}, title='{self.title}', category={self.category})>"
@@ -85,3 +104,26 @@ class PreferenceVote(Base):
 
     def __repr__(self) -> str:
         return f"<PreferenceVote(user_id={self.user_id}, card_id={self.card_id}, pref={self.preference})>"
+
+
+class CardTranslation(Base):
+    """Translations for card content in different languages."""
+    __tablename__ = "card_translations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    card_id: Mapped[int] = mapped_column(ForeignKey("cards.id", ondelete="CASCADE"), nullable=False)
+    locale: Mapped[str] = mapped_column(String(10), nullable=False)  # e.g., 'es', 'en', 'pt'
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    # Relationships
+    card: Mapped["Card"] = relationship("Card", back_populates="translations")
+
+    def __repr__(self) -> str:
+        return f"<CardTranslation(card_id={self.card_id}, locale='{self.locale}')>"

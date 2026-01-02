@@ -2,6 +2,7 @@
 
 // Enums
 export type CardCategory = 'calientes' | 'romance' | 'risas' | 'otras';
+export type TagType = 'category' | 'intensity' | 'subtag';
 export type CardSource = 'manual' | 'llm' | 'imported';
 export type CardStatus = 'active' | 'archived';
 export type PreferenceType = 'like' | 'dislike' | 'neutral' | 'maybe';
@@ -42,6 +43,22 @@ export interface LoginResponse {
   message: string;
 }
 
+// Tag
+export interface Tag {
+  id: number;
+  slug: string;
+  name: string;
+  tag_type: TagType;
+  parent_slug?: string | null;
+  display_order: number;
+}
+
+export interface TagsGroupedResponse {
+  categories: Tag[];
+  intensity: Tag[];
+  subtags: Tag[];
+}
+
 // Card
 export interface Card {
   id: number;
@@ -52,8 +69,11 @@ export interface Card {
   difficulty_level: number;
   credit_value: number;
   tags: string | null;
+  tags_list?: Tag[];
   source: CardSource;
   status: CardStatus;
+  is_enabled: boolean;
+  created_by_user_id?: number | null;
   created_at: string;
   user_preference?: PreferenceType | null;
   partner_preference?: PreferenceType | null;
@@ -158,6 +178,18 @@ export interface ProposalCreate {
   reward_details?: string | null;
 }
 
+export interface ProposalUpdate {
+  custom_title?: string | null;
+  custom_description?: string | null;
+  why_proposing?: string | null;
+  boundary?: string | null;
+  location?: string | null;
+  duration?: string | null;
+  boundaries_json?: string | null;
+  reward_type?: RewardType | null;
+  reward_details?: string | null;
+}
+
 export interface ProposalRespondRequest {
   response: ProposalStatus;
   credit_cost?: number; // Required when accepting (1-7)
@@ -205,4 +237,32 @@ export interface AdminResetResponse {
   message: string;
   votes_deleted: number;
   proposals_deleted: number;
+}
+
+// Card Content Management
+export interface CardContentUpdate {
+  title: string;
+  description: string;
+  locale: string;
+}
+
+export interface CardContentResponse {
+  id: number;
+  title: string;
+  description: string;
+  locale: string;
+  is_translation: boolean;
+}
+
+export interface CardCreateAdmin {
+  title: string;
+  description: string;
+  title_es?: string | null;
+  description_es?: string | null;
+  tags: string[];
+  intensity: string;
+  category: CardCategory;
+  spice_level: number;
+  difficulty_level: number;
+  credit_value: number;
 }

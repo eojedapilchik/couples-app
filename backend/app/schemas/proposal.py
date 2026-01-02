@@ -22,7 +22,7 @@ class ProposalCreate(BaseModel):
 
     # Custom reto (optional)
     custom_title: str | None = Field(None, max_length=200)
-    custom_description: str | None = Field(None, max_length=1000)
+    custom_description: str | None = Field(None, max_length=2000)
 
     # Guided challenge fields (Level 2)
     why_proposing: str | None = Field(None, max_length=500)
@@ -56,6 +56,19 @@ class ProposalCreate(BaseModel):
             if not self.boundaries_json:
                 raise ValueError("Los retos personalizados requieren limites/boundaries")
         return self
+
+
+class ProposalUpdate(BaseModel):
+    """Update a proposal before it is accepted."""
+    custom_title: str | None = Field(None, max_length=200)
+    custom_description: str | None = Field(None, max_length=2000)
+    why_proposing: str | None = Field(None, max_length=500)
+    boundary: str | None = Field(None, max_length=300)
+    location: str | None = Field(None, max_length=100)
+    duration: str | None = Field(None, max_length=50)
+    boundaries_json: str | None = None
+    reward_type: RewardType | None = None
+    reward_details: str | None = Field(None, max_length=200)
 
 
 class ProposalResponse(BaseModel):

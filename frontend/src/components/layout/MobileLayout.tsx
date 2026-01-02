@@ -83,12 +83,38 @@ export default function MobileLayout({
           flexGrow: 1,
           pt: '64px', // AppBar height
           pb: showNav ? '70px' : 0, // BottomNav height
-          px: 2,
           bgcolor: 'background.default',
           overflow: 'auto',
+          // Custom scrollbar - positioned on far right of viewport
+          '&::-webkit-scrollbar': {
+            width: '10px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: '#F5F5F5',
+            borderRadius: '0',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: 'linear-gradient(180deg, #A5B4FC 0%, #818CF8 100%)',
+            borderRadius: '10px',
+            border: '2px solid #F5F5F5',
+          },
+          '&::-webkit-scrollbar-thumb:hover': {
+            background: 'linear-gradient(180deg, #818CF8 0%, #6366F1 100%)',
+          },
+          scrollbarWidth: 'thin',
+          scrollbarColor: '#818CF8 #F5F5F5',
         }}
       >
-        {children}
+        <Box
+          sx={{
+            width: '100%',
+            maxWidth: { xs: '100%', md: '60%' },
+            mx: 'auto', // Center the content
+            px: { xs: 2, md: 3 },
+          }}
+        >
+          {children}
+        </Box>
       </Box>
 
       {/* Bottom Navigation */}

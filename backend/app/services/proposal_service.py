@@ -38,9 +38,9 @@ class ProposalService:
             ProposalStatus.REJECTED,
         },
         ProposalStatus.ACCEPTED: {
-            ProposalStatus.COMPLETED_PENDING,
+            ProposalStatus.COMPLETED_PENDING_CONFIRMATION,
         },
-        ProposalStatus.COMPLETED_PENDING: {
+        ProposalStatus.COMPLETED_PENDING_CONFIRMATION: {
             ProposalStatus.COMPLETED_CONFIRMED,
         },
     }
@@ -198,12 +198,14 @@ class ProposalService:
             raise ProposalError("Solo el destinatario puede marcar como completado")
 
         # Validate transition
-        if not ProposalService.can_transition(proposal.status, ProposalStatus.COMPLETED_PENDING):
+        if not ProposalService.can_transition(
+            proposal.status, ProposalStatus.COMPLETED_PENDING_CONFIRMATION
+        ):
             raise ProposalError(
                 f"Transicion invalida: {proposal.status} → completed_pending_confirmation"
             )
 
-        proposal.status = ProposalStatus.COMPLETED_PENDING
+        proposal.status = ProposalStatus.COMPLETED_PENDING_CONFIRMATION
         proposal.completed_requested_at = datetime.utcnow()
         db.commit()
         db.refresh(proposal)
@@ -250,6 +252,64 @@ class ProposalService:
         db.commit()
         db.refresh(proposal)
         return proposal
+
+    @staticmethod
+    def update_proposal(
+        db: Session,
+        proposal_id: int,
+        user_id: int,
+        update_data,
+    ) -> Proposal:
+        """Update a proposal before it is accepted."""
+        proposal = db.query(Proposal).filter(Proposal.id == proposal_id).first()
+        if not proposal:
+            raise ProposalError("Propuesta no encontrada")
+
+        if proposal.proposed_by_user_id != user_id:
+            raise ProposalError("Solo quien propuso puede editar")
+
+        if proposal.status not in {ProposalStatus.PROPOSED, ProposalStatus.MAYBE_LATER}:
+            raise ProposalError("Solo se puede editar antes de aceptar")
+
+        if proposal.card_id:
+            raise ProposalError("Solo los retos personalizados se pueden editar")
+
+        data = update_data.model_dump(exclude_unset=True)
+        for key, value in data.items():
+            setattr(proposal, key, value)
+
+        if not proposal.custom_title:
+            raise ProposalError("El titulo es obligatorio")
+
+        if proposal.challenge_type == ChallengeType.GUIDED and not proposal.boundary:
+            raise ProposalError("Los retos guiados requieren un limite/boundary")
+
+        if proposal.challenge_type == ChallengeType.CUSTOM and not proposal.boundaries_json:
+            raise ProposalError("Los retos personalizados requieren limites/boundaries")
+
+        db.commit()
+        db.refresh(proposal)
+        return proposal
+
+    @staticmethod
+    def delete_proposal(
+        db: Session,
+        proposal_id: int,
+        user_id: int,
+    ) -> None:
+        """Delete a proposal before it is accepted."""
+        proposal = db.query(Proposal).filter(Proposal.id == proposal_id).first()
+        if not proposal:
+            raise ProposalError("Propuesta no encontrada")
+
+        if proposal.proposed_by_user_id != user_id:
+            raise ProposalError("Solo quien propuso puede eliminar")
+
+        if proposal.status not in {ProposalStatus.PROPOSED, ProposalStatus.MAYBE_LATER}:
+            raise ProposalError("Solo se puede eliminar antes de aceptar")
+
+        db.delete(proposal)
+        db.commit()
 
     @staticmethod
     def get_proposals_for_user(

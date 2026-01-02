@@ -3,6 +3,7 @@ import { useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Home from './pages/Home';
 import CardLibrary from './pages/CardLibrary';
+import CardManager from './pages/CardManager';
 import Proposals from './pages/Proposals';
 import Period from './pages/Period';
 import Reports from './pages/Reports';
@@ -88,6 +89,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Settings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/cards"
+          element={
+            <ProtectedRoute>
+              <CardManager />
             </ProtectedRoute>
           }
         />

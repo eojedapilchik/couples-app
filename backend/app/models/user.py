@@ -1,7 +1,7 @@
 """User model - Partner A and Partner B."""
 
 from datetime import datetime
-from sqlalchemy import String, DateTime, Boolean
+from sqlalchemy import String, DateTime, Boolean, Integer, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -12,10 +12,22 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    nickname: Mapped[str | None] = mapped_column(String(50), nullable=True)  # Short name for placeholders
     pin_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    partner_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
+    )
+
+    # Self-referential relationship for partner
+    partner: Mapped["User | None"] = relationship(
+        "User",
+        remote_side=[id],
+        foreign_keys=[partner_id],
+        uselist=False,
     )
 
     # Relationships

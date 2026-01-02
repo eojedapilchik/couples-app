@@ -174,13 +174,14 @@ export default function SwipeableCardStack({
             position: 'absolute',
             width: '100%',
             height: '100%',
-            transform: `translateX(${offset}px) rotate(${offset / 20}deg)`,
+            transform: offset === 0 ? 'none' : `translateX(${offset}px) rotate(${offset / 20}deg)`,
             opacity: Math.abs(offset) > 300 ? 0 : 1,
             transition: (swiping || exiting) ? 'none' : 'transform 0.15s ease-out, opacity 0.15s',
             touchAction: 'pan-y',
             userSelect: 'none',
             cursor: 'grab',
             '&:active': { cursor: 'grabbing' },
+            backfaceVisibility: 'hidden',
           }}
         >
           <GameCard card={currentCard} size="large" />

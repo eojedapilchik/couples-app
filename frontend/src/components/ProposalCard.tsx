@@ -20,6 +20,8 @@ import {
   Close as RejectIcon,
   Done as CompleteIcon,
   Verified as ConfirmIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import type { Proposal, ProposalStatus, ChallengeType, RewardType } from '../api/types';
 import { getCategoryColor } from '../theme/theme';
@@ -41,9 +43,12 @@ const rewardTypeLabels: Record<RewardType, string> = {
 interface ProposalCardProps {
   proposal: Proposal;
   isRecipient: boolean;
+  currentUserId?: number | null;
   onRespond?: (proposalId: number, response: ProposalStatus, creditCost?: number) => void;
   onMarkComplete?: () => void;
   onConfirmCompletion?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
 const statusLabels: Record<ProposalStatus, string> = {
@@ -69,14 +74,22 @@ const statusColors: Record<ProposalStatus, string> = {
 export default function ProposalCard({
   proposal,
   isRecipient,
+  currentUserId,
   onRespond,
   onMarkComplete,
   onConfirmCompletion,
+  onEdit,
+  onDelete,
 }: ProposalCardProps) {
   const [acceptDialog, setAcceptDialog] = useState(false);
   const [creditCost, setCreditCost] = useState(3);
 
-  const isProposer = !isRecipient;
+  const resolvedIsRecipient = currentUserId != null
+    ? proposal.proposed_to_user_id === currentUserId
+    : isRecipient;
+  const isProposer = currentUserId != null
+    ? proposal.proposed_by_user_id === currentUserId
+    : !resolvedIsRecipient;
 
   // Get display info from card or custom fields
   const displayTitle = proposal.display_title || proposal.custom_title || proposal.card?.title || 'Reto';
@@ -87,9 +100,11 @@ export default function ProposalCard({
     ? getCategoryColor(proposal.card.category)
     : { main: '#6B7280' }; // Gray for custom
 
-  const canRespond = isRecipient && proposal.status === 'proposed';
-  const canMarkComplete = isRecipient && proposal.status === 'accepted';
+  const canRespond = resolvedIsRecipient && proposal.status === 'proposed';
+  const canMarkComplete = resolvedIsRecipient && proposal.status === 'accepted';
   const canConfirm = isProposer && proposal.status === 'completed_pending_confirmation';
+  const canEdit = isProposer && !proposal.card_id && ['proposed', 'maybe_later'].includes(proposal.status);
+  const canDelete = isProposer && ['proposed', 'maybe_later'].includes(proposal.status);
 
   const handleAccept = () => {
     setAcceptDialog(true);
@@ -132,7 +147,7 @@ export default function ProposalCard({
                 {isRecipient ? 'De' : 'A'}
               </Avatar>
               <Typography variant="body2" color="text.secondary">
-                {isRecipient
+                {resolvedIsRecipient
                   ? `De: ${proposal.proposed_by?.name || 'Pareja'}`
                   : `A: ${proposal.proposed_to?.name || 'Pareja'}`}
               </Typography>
@@ -279,7 +294,7 @@ export default function ProposalCard({
         </CardContent>
 
         {/* Actions */}
-        {(canRespond || canMarkComplete || canConfirm) && (
+        {(canRespond || canMarkComplete || canConfirm || canEdit || canDelete) && (
           <CardActions sx={{ px: 2, pb: 2 }}>
             {canRespond && onRespond && (
               <>
@@ -332,6 +347,27 @@ export default function ProposalCard({
                 onClick={onConfirmCompletion}
               >
                 Confirmar
+              </Button>
+            )}
+            {canEdit && onEdit && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<EditIcon />}
+                onClick={onEdit}
+              >
+                Editar
+              </Button>
+            )}
+            {canDelete && onDelete && (
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={onDelete}
+              >
+                Eliminar
               </Button>
             )}
           </CardActions>

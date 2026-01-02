@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Proposal, ProposalStatus, ProposalCreate } from '../api/types';
+import type { Proposal, ProposalStatus, ProposalCreate, ProposalUpdate } from '../api/types';
 import { proposalsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
@@ -40,6 +40,21 @@ export function useProposals(asRecipient = true, status?: ProposalStatus) {
     const newProposal = await proposalsApi.createProposal(proposal, user.id);
     setProposals((prev) => [newProposal, ...prev]);
     return newProposal;
+  };
+
+  const updateProposal = async (proposalId: number, proposal: ProposalUpdate) => {
+    if (!user) throw new Error('No user logged in');
+
+    const updated = await proposalsApi.updateProposal(proposalId, proposal, user.id);
+    setProposals((prev) => prev.map((p) => (p.id === proposalId ? updated : p)));
+    return updated;
+  };
+
+  const deleteProposal = async (proposalId: number) => {
+    if (!user) throw new Error('No user logged in');
+
+    await proposalsApi.deleteProposal(proposalId, user.id);
+    setProposals((prev) => prev.filter((p) => p.id !== proposalId));
   };
 
   const respondToProposal = async (
@@ -88,6 +103,8 @@ export function useProposals(asRecipient = true, status?: ProposalStatus) {
     error,
     refetch: fetchProposals,
     createProposal,
+    updateProposal,
+    deleteProposal,
     respondToProposal,
     markComplete,
     confirmCompletion,

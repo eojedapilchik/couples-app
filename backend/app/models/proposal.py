@@ -13,7 +13,7 @@ class ProposalStatus(str, Enum):
     ACCEPTED = "accepted"
     MAYBE_LATER = "maybe_later"
     REJECTED = "rejected"
-    COMPLETED_PENDING = "completed_pending_confirmation"
+    COMPLETED_PENDING_CONFIRMATION = "completed_pending_confirmation"
     COMPLETED_CONFIRMED = "completed_confirmed"
     EXPIRED = "expired"
 
@@ -56,7 +56,7 @@ class Proposal(Base):
 
     # Custom reto fields (when card_id is None)
     custom_title: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    custom_description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    custom_description: Mapped[str | None] = mapped_column(String(2000), nullable=True)
 
     # Guided challenge fields (Level 2)
     why_proposing: Mapped[str | None] = mapped_column(String(500), nullable=True)
