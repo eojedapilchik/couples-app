@@ -24,11 +24,16 @@ echo ""
 echo "Waiting for backend to be ready..."
 sleep 5
 
+# Run migrations
+echo ""
+echo "Running migrations..."
+docker compose --profile migrate up migrate
+
 # Check if database needs seeding
 if ! docker compose exec backend test -f /data/couple_cards.db 2>/dev/null; then
     echo ""
     echo "Seeding database with users and cards..."
-    docker compose run --rm seed
+    docker compose --profile seed run --rm seed
 fi
 
 # Get local IP
