@@ -27,6 +27,9 @@ export type Card = {
   spice_level: number;
   difficulty_level: number;
   credit_value: number;
+  is_challenge: boolean;
+  question_type?: string | null;
+  question_params?: string | null;
   tags: string | null;
   is_enabled: boolean;
   tags_list?: Tag[];

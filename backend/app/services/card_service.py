@@ -1,5 +1,6 @@
 """Card Service - Card CRUD and voting logic."""
 
+import json
 import random
 from sqlalchemy.orm import Session, joinedload
 
@@ -61,6 +62,9 @@ class CardService:
             "spice_level": card.spice_level,
             "difficulty_level": card.difficulty_level,
             "credit_value": card.credit_value,
+            "is_challenge": card.is_challenge,
+            "question_type": card.question_type,
+            "question_params": card.question_params,
             "tags": card.tags,
             "source": card.source,
             "status": card.status,
@@ -113,10 +117,20 @@ class CardService:
         difficulty_level: int = 1,
         credit_value: int = 3,
         tags: str | None = None,
+        is_challenge: bool = False,
+        question_type: str | None = None,
+        question_params: str | None = None,
         source: str = "manual",
     ) -> Card:
         """Create a new card."""
         from app.models.card import CardSource
+        default_question_params = (
+            question_params
+            if question_params is not None
+            else json.dumps(
+                {"options": {"en": ["Yes", "No", "Maybe"], "es": ["Si", "No", "Quizas"]}}
+            )
+        )
         card = Card(
             title=title,
             description=description,
@@ -126,6 +140,9 @@ class CardService:
             credit_value=credit_value,
             tags=tags,
             source=CardSource(source),
+            is_challenge=is_challenge,
+            question_type=None if is_challenge else (question_type or "single_select"),
+            question_params=None if is_challenge else default_question_params,
         )
         db.add(card)
         db.commit()
@@ -572,6 +589,9 @@ class CardService:
         tags: list[str] | None = None,
         intensity: str | None = None,
         grouping_ids: list[int] | None = None,
+        is_challenge: bool | None = None,
+        question_type: str | None = None,
+        question_params: str | None = None,
     ) -> dict | None:
         """Update card content, translations, tags, and groupings in one call."""
         import json
@@ -579,6 +599,9 @@ class CardService:
         card = CardService.get_card(db, card_id)
         if not card:
             return None
+
+        if is_challenge is not None:
+            card.is_challenge = is_challenge
 
         if title is not None:
             card.title = title
@@ -638,6 +661,21 @@ class CardService:
             if grouping_ids:
                 groupings = db.query(Grouping).filter(Grouping.id.in_(grouping_ids)).all()
             card.groupings = groupings
+
+        if card.is_challenge:
+            card.question_type = None
+            card.question_params = None
+        else:
+            if question_type is not None:
+                card.question_type = question_type
+            if question_params is not None:
+                card.question_params = question_params
+            if card.question_type is None:
+                card.question_type = "single_select"
+            if card.question_params is None:
+                card.question_params = json.dumps(
+                    {"options": {"en": ["Yes", "No", "Maybe"], "es": ["Si", "No", "Quizas"]}}
+                )
 
         db.commit()
         db.refresh(card)
@@ -734,6 +772,9 @@ class CardService:
         tags: list[str],
         intensity: str,
         grouping_ids: list[int],
+        is_challenge: bool,
+        question_type: str | None,
+        question_params: str | None,
         category: CardCategory,
         spice_level: int,
         difficulty_level: int,
@@ -750,6 +791,14 @@ class CardService:
             "intensity": intensity,
         }
 
+        default_question_params = (
+            question_params
+            if question_params is not None
+            else json.dumps(
+                {"options": {"en": ["Yes", "No", "Maybe"], "es": ["Si", "No", "Quizas"]}}
+            )
+        )
+
         card = Card(
             title=title,
             description=description,
@@ -760,6 +809,9 @@ class CardService:
             tags=json.dumps(tags_data),
             source=CardSource.MANUAL,
             created_by_user_id=created_by_user_id,
+            is_challenge=is_challenge,
+            question_type=None if is_challenge else (question_type or "single_select"),
+            question_params=None if is_challenge else default_question_params,
         )
         db.add(card)
         db.flush()  # Get the card ID

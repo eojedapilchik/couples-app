@@ -6,6 +6,7 @@ import {
   ListItemText,
   MenuItem,
   OutlinedInput,
+  Autocomplete,
   Select,
   type SelectChangeEvent,
   TextField,
@@ -45,6 +46,15 @@ const parseCardTags = (tagsJson: string | null) => {
 
 const getTagLabel = (tag: Tag) => tag.name_es || tag.name || tag.slug;
 
+const QUESTION_TYPE_OPTIONS = [
+  { value: "single_select", label: "Single select" },
+  { value: "multi_select", label: "Multi select" },
+  { value: "boolean", label: "Boolean" },
+  { value: "rating", label: "Rating" },
+  { value: "text", label: "Open text" },
+  { value: "image", label: "Image upload" },
+];
+
 export default function App() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -76,6 +86,13 @@ export default function App() {
     tags: [] as string[],
     intensity: "",
     grouping_ids: [] as number[],
+    is_challenge: false,
+    question_type: "single_select",
+    question_params: JSON.stringify(
+      { options: { en: ["Yes", "No", "Maybe"], es: ["Si", "No", "Quizas"] } },
+      null,
+      2
+    ),
   });
 
   const [selectedCardId, setSelectedCardId] = useState<number | "">("");
@@ -87,6 +104,9 @@ export default function App() {
     tags: [] as string[],
     intensity: "",
     grouping_ids: [] as number[],
+    is_challenge: false,
+    question_type: "single_select",
+    question_params: "",
   });
 
   const [tagForm, setTagForm] = useState({
@@ -149,6 +169,9 @@ export default function App() {
       tags: parsed.tags,
       intensity: parsed.intensity,
       grouping_ids: selectedCard.groupings_list?.map((grouping) => grouping.id) || [],
+      is_challenge: selectedCard.is_challenge,
+      question_type: selectedCard.question_type || "single_select",
+      question_params: selectedCard.question_params || "",
     });
     loadCardTranslation(selectedCard.id);
     if (editorRef.current) {
@@ -373,6 +396,9 @@ export default function App() {
           tags: createForm.tags,
           intensity: createForm.intensity || "standard",
           grouping_ids: createForm.grouping_ids,
+          is_challenge: createForm.is_challenge,
+          question_type: createForm.is_challenge ? null : createForm.question_type,
+          question_params: createForm.is_challenge ? null : createForm.question_params,
           category: createForm.category,
           spice_level: createForm.spice_level,
           difficulty_level: createForm.difficulty_level,
@@ -394,6 +420,13 @@ export default function App() {
         tags: [],
         intensity: intensityOptions[0]?.slug || "standard",
         grouping_ids: [],
+        is_challenge: false,
+        question_type: "single_select",
+        question_params: JSON.stringify(
+          { options: { en: ["Yes", "No", "Maybe"], es: ["Si", "No", "Quizas"] } },
+          null,
+          2
+        ),
       });
       await loadCards(token);
       setShowCardModal(false);
@@ -429,6 +462,9 @@ export default function App() {
           tags: editorForm.tags,
           intensity: editorForm.intensity || "standard",
           grouping_ids: editorForm.grouping_ids,
+          is_challenge: editorForm.is_challenge,
+          question_type: editorForm.is_challenge ? null : editorForm.question_type,
+          question_params: editorForm.is_challenge ? null : editorForm.question_params,
         }),
       });
       if (!response.ok) {
@@ -781,24 +817,26 @@ export default function App() {
               <div className="dashboard-grid">
                 <div className="panel-section" ref={editorRef}>
                   <h3>Editor de cartas</h3>
-                  <label>
-                    Seleccionar carta
-                    <select
-                      value={selectedCardId}
-                      onChange={(event) =>
-                        setSelectedCardId(
-                          event.target.value ? Number(event.target.value) : ("" as const)
-                        )
+                  <div className="panel-subsection">
+                    <Autocomplete
+                      options={cards}
+                      value={selectedCard}
+                      onChange={(_, value) =>
+                        setSelectedCardId(value ? value.id : ("" as const))
                       }
-                    >
-                      <option value="">Selecciona una carta</option>
-                      {cards.map((card) => (
-                        <option key={card.id} value={card.id}>
-                          {card.title}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      getOptionLabel={(option) => option.title}
+                      isOptionEqualToValue={(option, value) => option.id === value.id}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Seleccionar carta"
+                          placeholder="Busca por titulo"
+                          size="small"
+                          fullWidth
+                        />
+                      )}
+                    />
+                  </div>
 
                   {selectedCard ? (
                     <>
@@ -832,8 +870,8 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div>
-                          <h4>Contenido (ES)</h4>
+                      <div>
+                        <h4>Contenido (ES)</h4>
                           <div className="stack">
                             <TextField
                               label="Titulo"
@@ -859,10 +897,66 @@ export default function App() {
                             minRows={2}
                           />
                           </div>
-                        </div>
+                      </div>
 
-                        <div>
-                          <h4>Tags e intensidad</h4>
+                      <div>
+                        <h4>Tipo de carta</h4>
+                        <div className="stack">
+                          <FormControl size="small" fullWidth>
+                            <InputLabel>Tipo</InputLabel>
+                            <Select
+                              value={editorForm.is_challenge ? "challenge" : "question"}
+                              label="Tipo"
+                              onChange={(event) =>
+                                setEditorForm((prev) => ({
+                                  ...prev,
+                                  is_challenge: event.target.value === "challenge",
+                                }))
+                              }
+                            >
+                              <MenuItem value="question">Pregunta</MenuItem>
+                              <MenuItem value="challenge">Reto</MenuItem>
+                            </Select>
+                          </FormControl>
+                          <FormControl size="small" fullWidth disabled={editorForm.is_challenge}>
+                            <InputLabel>Question type</InputLabel>
+                            <Select
+                              value={editorForm.question_type || "single_select"}
+                              label="Question type"
+                              onChange={(event) =>
+                                setEditorForm((prev) => ({
+                                  ...prev,
+                                  question_type: event.target.value,
+                                }))
+                              }
+                            >
+                              {QUESTION_TYPE_OPTIONS.map((option) => (
+                                <MenuItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                          <TextField
+                            label="Question params (JSON)"
+                            value={editorForm.question_params}
+                            onChange={(event) =>
+                              setEditorForm((prev) => ({
+                                ...prev,
+                                question_params: event.target.value,
+                              }))
+                            }
+                            size="small"
+                            fullWidth
+                            multiline
+                            minRows={3}
+                            disabled={editorForm.is_challenge}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4>Tags e intensidad</h4>
                           <div className="stack">
                             <FormControl size="small" fullWidth>
                               <InputLabel>Intensidad</InputLabel>
@@ -990,7 +1084,12 @@ export default function App() {
                     <p className="description">{card.description}</p>
                     <footer>
                       <span>Creditos: {card.credit_value}</span>
-                      <span className="tag">{card.is_enabled ? "Activa" : "Desactivada"}</span>
+                      <span className="tag">
+                        {card.is_challenge ? "Reto" : "Pregunta"}
+                      </span>
+                      <span className="tag">
+                        {card.is_enabled ? "Activa" : "Desactivada"}
+                      </span>
                     </footer>
                   </article>
                 ))}
@@ -1160,6 +1259,56 @@ export default function App() {
                       }
                     />
                   </label>
+                  <FormControl size="small" fullWidth>
+                    <InputLabel>Tipo</InputLabel>
+                    <Select
+                      value={createForm.is_challenge ? "challenge" : "question"}
+                      label="Tipo"
+                      onChange={(event) =>
+                        setCreateForm((prev) => ({
+                          ...prev,
+                          is_challenge: event.target.value === "challenge",
+                        }))
+                      }
+                    >
+                      <MenuItem value="question">Pregunta</MenuItem>
+                      <MenuItem value="challenge">Reto</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <FormControl size="small" fullWidth disabled={createForm.is_challenge}>
+                    <InputLabel>Question type</InputLabel>
+                    <Select
+                      value={createForm.question_type}
+                      label="Question type"
+                      onChange={(event) =>
+                        setCreateForm((prev) => ({
+                          ...prev,
+                          question_type: event.target.value,
+                        }))
+                      }
+                    >
+                      {QUESTION_TYPE_OPTIONS.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <TextField
+                    label="Question params (JSON)"
+                    value={createForm.question_params}
+                    onChange={(event) =>
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        question_params: event.target.value,
+                      }))
+                    }
+                    size="small"
+                    fullWidth
+                    multiline
+                    minRows={3}
+                    disabled={createForm.is_challenge}
+                  />
                   <label>
                     Categoria
                     <select

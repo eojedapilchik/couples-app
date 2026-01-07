@@ -292,6 +292,13 @@ button.danger {
   gap: 16px;
 }
 
+.panel-subsection {
+  padding: 12px;
+  border-radius: 14px;
+  background: #fff6f9;
+  border: 1px dashed rgba(233, 30, 99, 0.2);
+}
+
 .panel-section h3 {
   margin: 0;
 }
@@ -421,6 +428,8 @@ button.danger {
 .card footer {
   display: flex;
   justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
   font-size: 0.8rem;
   color: var(--muted);
 }

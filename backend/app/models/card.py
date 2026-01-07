@@ -47,6 +47,9 @@ class Card(Base):
     spice_level: Mapped[int] = mapped_column(Integer, default=1)  # 1-5
     difficulty_level: Mapped[int] = mapped_column(Integer, default=1)  # 1-5
     credit_value: Mapped[int] = mapped_column(Integer, default=3)  # 1-10
+    is_challenge: Mapped[bool] = mapped_column(default=False, nullable=False)
+    question_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    question_params: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[CardSource] = mapped_column(
         SQLEnum(CardSource), default=CardSource.MANUAL
     )

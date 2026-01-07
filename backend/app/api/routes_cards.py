@@ -146,6 +146,9 @@ def create_card(
         difficulty_level=card.difficulty_level,
         credit_value=card.credit_value,
         tags=card.tags,
+        is_challenge=card.is_challenge,
+        question_type=card.question_type,
+        question_params=card.question_params,
         source=card.source.value,
     )
     card_dict = CardService._build_card_dict(db, new_card, locale=locale)
@@ -307,6 +310,9 @@ def update_card_admin(
         tags=card_update.tags,
         intensity=card_update.intensity,
         grouping_ids=card_update.grouping_ids,
+        is_challenge=card_update.is_challenge,
+        question_type=card_update.question_type,
+        question_params=card_update.question_params,
     )
     if not card_dict:
         raise HTTPException(status_code=404, detail="Carta no encontrada")
@@ -395,6 +401,9 @@ def create_card_admin(
         tags=card_data.tags,
         intensity=card_data.intensity,
         grouping_ids=card_data.grouping_ids,
+        is_challenge=card_data.is_challenge,
+        question_type=card_data.question_type,
+        question_params=card_data.question_params,
         category=card_data.category,
         spice_level=card_data.spice_level,
         difficulty_level=card_data.difficulty_level,

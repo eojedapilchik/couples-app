@@ -16,6 +16,9 @@ class CardBase(BaseModel):
     difficulty_level: int = Field(default=1, ge=1, le=5)
     credit_value: int = Field(default=3, ge=1, le=10)
     tags: str | None = None
+    is_challenge: bool = False
+    question_type: str | None = None
+    question_params: str | None = None
 
 
 class CardCreate(CardBase):
@@ -107,6 +110,9 @@ class CardUpdateAdmin(BaseModel):
     tags: list[str] | None = None
     intensity: str | None = None
     grouping_ids: list[int] | None = None
+    is_challenge: bool | None = None
+    question_type: str | None = None
+    question_params: str | None = None
 
 
 class CardCreateAdmin(BaseModel):
@@ -118,6 +124,9 @@ class CardCreateAdmin(BaseModel):
     tags: list[str] = Field(default_factory=list, description="List of tag slugs")
     intensity: str = Field(default="standard", description="Intensity level")
     grouping_ids: list[int] = Field(default_factory=list, description="List of grouping IDs")
+    is_challenge: bool = Field(default=False, description="Challenge flag")
+    question_type: str | None = Field(default=None, description="Question type")
+    question_params: str | None = Field(default=None, description="Question params JSON")
     category: CardCategory = CardCategory.CALIENTES
     spice_level: int = Field(default=1, ge=1, le=5)
     difficulty_level: int = Field(default=1, ge=1, le=5)
