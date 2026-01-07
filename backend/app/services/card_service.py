@@ -587,6 +587,8 @@ class CardService:
 
         if translations:
             for locale, payload in translations.items():
+                if hasattr(payload, "model_dump"):
+                    payload = payload.model_dump(exclude_unset=True)
                 if locale == "en":
                     if payload.get("title") is not None:
                         card.title = payload["title"]
