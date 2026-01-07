@@ -1,13 +1,15 @@
 """Admin routes - System administration endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.models.user import User
 from app.models.card import PreferenceVote
 from app.models.proposal import Proposal
+from app.api.admin_access import require_admin_access
+from app.api.backoffice_dependencies import get_backoffice_user_optional
+from app.models.backoffice_user import BackofficeUser
 
 router = APIRouter()
 
@@ -19,14 +21,13 @@ class ResetResponse(BaseModel):
 
 
 @router.post("/reset", response_model=ResetResponse)
-def reset_all_data(user_id: int, db: Session = Depends(get_db)):
+def reset_all_data(
+    user_id: int | None = Query(None, description="Admin user ID"),
+    db: Session = Depends(get_db),
+    backoffice_user: BackofficeUser | None = Depends(get_backoffice_user_optional),
+):
     """Reset all votes and proposals. Admin only."""
-    # Check if user is admin
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    if not user.is_admin:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden hacer esto")
+    require_admin_access(db, user_id, backoffice_user)
 
     # Delete all preference votes
     votes_count = db.query(PreferenceVote).count()

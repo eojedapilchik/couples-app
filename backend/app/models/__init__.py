@@ -6,6 +6,7 @@ from app.models.period import Period
 from app.models.proposal import Proposal
 from app.models.credit import CreditBalance, CreditLedger
 from app.models.tag import Tag
+from app.models.backoffice_user import BackofficeUser
 
 __all__ = [
     "User",
@@ -16,4 +17,5 @@ __all__ = [
     "CreditBalance",
     "CreditLedger",
     "Tag",
+    "BackofficeUser",
 ]

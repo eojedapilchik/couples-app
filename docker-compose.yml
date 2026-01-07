@@ -60,6 +60,21 @@ services:
     networks:
       - couple-cards-network
 
+  backoffice:
+    build:
+      context: ./backoffice-frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=/api
+    container_name: couple-cards-backoffice
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:3001:80"
+    depends_on:
+      - backend
+    networks:
+      - couple-cards-network
+
   seed:
     build:
       context: ./backend

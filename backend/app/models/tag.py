@@ -26,6 +26,8 @@ class Tag(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     slug: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    name_en: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    name_es: Mapped[str | None] = mapped_column(String(100), nullable=True)
     tag_type: Mapped[str] = mapped_column(String(30), nullable=False)  # category, intensity, subtag
     parent_slug: Mapped[str | None] = mapped_column(String(50), nullable=True)  # For subtags
     display_order: Mapped[int] = mapped_column(Integer, default=0)

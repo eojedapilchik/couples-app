@@ -1,0 +1,1025 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { Card, Tag } from "./types";
+
+const STORAGE_KEY = "backoffice_basic_token";
+
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(
+  /\/$/,
+  ""
+) || "http://localhost:8000";
+
+const CATEGORY_OPTIONS = ["calientes", "romance", "risas", "otras"];
+
+const buildBasicToken = (username: string, password: string) =>
+  btoa(`${username}:${password}`);
+
+const getAuthHeaders = (token: string) => ({
+  Authorization: `Basic ${token}`,
+});
+
+const parseCardTags = (tagsJson: string | null) => {
+  if (!tagsJson) {
+    return { tags: [] as string[], intensity: "" };
+  }
+  try {
+    const data = JSON.parse(tagsJson);
+    return {
+      tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
+      intensity: typeof data.intensity === "string" ? data.intensity : "",
+    };
+  } catch {
+    return { tags: [] as string[], intensity: "" };
+  }
+};
+
+const toggleTag = (tags: string[], slug: string) =>
+  tags.includes(slug) ? tags.filter((t) => t !== slug) : [...tags, slug];
+
+const getTagLabel = (tag: Tag) => tag.name_es || tag.name || tag.slug;
+
+export default function App() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [token, setToken] = useState(() => localStorage.getItem(STORAGE_KEY) || "");
+  const [cards, setCards] = useState<Card[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"cards" | "tags">("cards");
+  const [showCardModal, setShowCardModal] = useState(false);
+  const [showTagModal, setShowTagModal] = useState(false);
+  const editorRef = useRef<HTMLDivElement | null>(null);
+
+  const [createForm, setCreateForm] = useState({
+    title: "",
+    description: "",
+    title_es: "",
+    description_es: "",
+    category: CATEGORY_OPTIONS[0],
+    spice_level: 1,
+    difficulty_level: 1,
+    credit_value: 3,
+    tags: [] as string[],
+    intensity: "",
+  });
+
+  const [selectedCardId, setSelectedCardId] = useState<number | "">("");
+  const [editorForm, setEditorForm] = useState({
+    title: "",
+    description: "",
+    title_es: "",
+    description_es: "",
+    tags: [] as string[],
+    intensity: "",
+  });
+
+  const [tagForm, setTagForm] = useState({
+    slug: "",
+    name_es: "",
+    name_en: "",
+    tag_type: "category",
+    parent_slug: "",
+    display_order: 0,
+  });
+
+  const isAuthed = useMemo(() => Boolean(token), [token]);
+  const selectedCard = useMemo(
+    () => cards.find((card) => card.id === selectedCardId) || null,
+    [cards, selectedCardId]
+  );
+
+  const intensityOptions = useMemo(
+    () => tags.filter((tag) => tag.tag_type === "intensity"),
+    [tags]
+  );
+
+  const selectableTags = useMemo(
+    () => tags.filter((tag) => tag.tag_type !== "intensity"),
+    [tags]
+  );
+
+  useEffect(() => {
+    if (!isAuthed) return;
+    loadCards(token);
+    loadTags(token);
+  }, [isAuthed, token]);
+
+  useEffect(() => {
+    if (!selectedCard) return;
+    const parsed = parseCardTags(selectedCard.tags);
+    setEditorForm({
+      title: selectedCard.title,
+      description: selectedCard.description,
+      title_es: "",
+      description_es: "",
+      tags: parsed.tags,
+      intensity: parsed.intensity,
+    });
+    loadCardTranslation(selectedCard.id);
+    if (editorRef.current) {
+      editorRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedCardId, cards]);
+
+  useEffect(() => {
+    if (!createForm.intensity && intensityOptions.length > 0) {
+      setCreateForm((prev) => ({ ...prev, intensity: intensityOptions[0].slug }));
+    }
+  }, [createForm.intensity, intensityOptions]);
+
+  useEffect(() => {
+    if (!editorForm.intensity && intensityOptions.length > 0) {
+      setEditorForm((prev) => ({ ...prev, intensity: intensityOptions[0].slug }));
+    }
+  }, [editorForm.intensity, intensityOptions]);
+
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/backoffice/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Credenciales invalidas");
+      }
+
+      const newToken = buildBasicToken(username, password);
+      localStorage.setItem(STORAGE_KEY, newToken);
+      setToken(newToken);
+      setUsername("");
+      setPassword("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setToken("");
+    setCards([]);
+    setTags([]);
+  };
+
+  const loadCards = async (authToken = token) => {
+    if (!authToken) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/cards/admin/all?include_disabled=true&limit=500&offset=0`,
+        {
+          headers: {
+            ...getAuthHeaders(authToken),
+          },
+        }
+      );
+      if (!response.ok) {
+        if (response.status === 401) {
+          handleLogout();
+        }
+        throw new Error("No se pudo cargar las cartas");
+      }
+      const data = (await response.json()) as { cards: Card[] };
+      setCards(data.cards);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadTags = async (authToken = token) => {
+    if (!authToken) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/tags`, {
+        headers: {
+          ...getAuthHeaders(authToken),
+        },
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo cargar los tags");
+      }
+      const data = (await response.json()) as Tag[];
+      setTags(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    }
+  };
+
+  const loadCardTranslation = async (cardId: number) => {
+    if (!token) return;
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/cards/${cardId}/content?locale=es`,
+        {
+          headers: {
+            ...getAuthHeaders(token),
+          },
+        }
+      );
+      if (!response.ok) {
+        return;
+      }
+      const data = (await response.json()) as { title: string; description: string };
+      setEditorForm((prev) => ({
+        ...prev,
+        title_es: data.title || "",
+        description_es: data.description || "",
+      }));
+    } catch {
+      // Ignore translation errors
+    }
+  };
+
+  const toggleCard = async (cardId: number, enabled: boolean) => {
+    if (!token) return;
+    setError(null);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/cards/${cardId}/toggle?enabled=${enabled}`,
+        {
+          method: "PATCH",
+          headers: {
+            ...getAuthHeaders(token),
+          },
+        }
+      );
+      if (!response.ok) {
+        throw new Error("No se pudo actualizar la carta");
+      }
+      setCards((prev) =>
+        prev.map((card) => (card.id === cardId ? { ...card, is_enabled: enabled } : card))
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    }
+  };
+
+  const handleCreateCard = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!token) return;
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/cards/admin/create`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(token),
+        },
+        body: JSON.stringify({
+          title: createForm.title,
+          description: createForm.description,
+          title_es: createForm.title_es || null,
+          description_es: createForm.description_es || null,
+          tags: createForm.tags,
+          intensity: createForm.intensity || "standard",
+          category: createForm.category,
+          spice_level: createForm.spice_level,
+          difficulty_level: createForm.difficulty_level,
+          credit_value: createForm.credit_value,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo crear la carta");
+      }
+      setCreateForm({
+        title: "",
+        description: "",
+        title_es: "",
+        description_es: "",
+        category: CATEGORY_OPTIONS[0],
+        spice_level: 1,
+        difficulty_level: 1,
+        credit_value: 3,
+        tags: [],
+        intensity: intensityOptions[0]?.slug || "standard",
+      });
+      await loadCards(token);
+      setShowCardModal(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    }
+  };
+
+  const handleUpdateCardContent = async (locale: "en" | "es") => {
+    if (!token || !selectedCard) return;
+    setError(null);
+    const payload =
+      locale === "en"
+        ? { title: editorForm.title, description: editorForm.description, locale }
+        : { title: editorForm.title_es, description: editorForm.description_es, locale };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/cards/${selectedCard.id}/content`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(token),
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo actualizar el contenido");
+      }
+      await loadCards(token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    }
+  };
+
+  const handleUpdateCardTags = async () => {
+    if (!token || !selectedCard) return;
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/cards/${selectedCard.id}/tags`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(token),
+        },
+        body: JSON.stringify({
+          tags: editorForm.tags,
+          intensity: editorForm.intensity || "standard",
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo actualizar los tags");
+      }
+      await loadCards(token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    }
+  };
+
+  const handleCreateTag = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!token) return;
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/tags`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(token),
+        },
+        body: JSON.stringify({
+          slug: tagForm.slug,
+          name: tagForm.name_es || tagForm.name_en,
+          name_es: tagForm.name_es || null,
+          name_en: tagForm.name_en || null,
+          tag_type: tagForm.tag_type,
+          parent_slug: tagForm.parent_slug || null,
+          display_order: tagForm.display_order,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo crear el tag");
+      }
+      setTagForm({
+        slug: "",
+        name_es: "",
+        name_en: "",
+        tag_type: "category",
+        parent_slug: "",
+        display_order: 0,
+      });
+      await loadTags(token);
+      setShowTagModal(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    }
+  };
+
+  const handleUpdateTag = async (tag: Tag) => {
+    if (!token) return;
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/tags/${tag.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(token),
+        },
+        body: JSON.stringify({
+          slug: tag.slug,
+          name: tag.name_es || tag.name,
+          name_es: tag.name_es || null,
+          name_en: tag.name_en || null,
+          tag_type: tag.tag_type,
+          parent_slug: tag.parent_slug || null,
+          display_order: tag.display_order,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo actualizar el tag");
+      }
+      await loadTags(token);
+      await loadCards(token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    }
+  };
+
+  const handleDeleteTag = async (tagId: number) => {
+    if (!token) return;
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/tags/${tagId}`, {
+        method: "DELETE",
+        headers: {
+          ...getAuthHeaders(token),
+        },
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo eliminar el tag");
+      }
+      await loadTags(token);
+      await loadCards(token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    }
+  };
+
+  const updateTagField = (tagId: number, field: keyof Tag, value: string | number) => {
+    setTags((prev) =>
+      prev.map((tag) => (tag.id === tagId ? { ...tag, [field]: value } : tag))
+    );
+  };
+
+  return (
+    <div className="page">
+      <header className="hero">
+        <div>
+          <p className="eyebrow">Backoffice</p>
+          <h1>Control Room</h1>
+          <p className="subtitle">
+            Administra cartas, traducciones y tags. Acceso restringido a usuarios de backoffice.
+          </p>
+        </div>
+        {isAuthed && (
+          <div className="header-actions">
+            <div className="tabs">
+              <button
+                className={activeTab === "cards" ? "tab active" : "tab"}
+                onClick={() => setActiveTab("cards")}
+              >
+                Cartas
+              </button>
+              <button
+                className={activeTab === "tags" ? "tab active" : "tab"}
+                onClick={() => setActiveTab("tags")}
+              >
+                Tags
+              </button>
+            </div>
+            <button className="ghost" onClick={handleLogout}>
+              Cerrar sesion
+            </button>
+          </div>
+        )}
+      </header>
+
+      {!isAuthed ? (
+        <section className="panel login-panel">
+          <div>
+            <h2>Ingreso seguro</h2>
+            <p>Usa tus credenciales de backoffice para continuar.</p>
+          </div>
+          <form onSubmit={handleLogin} className="login-form">
+            <label>
+              Usuario
+              <input
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                placeholder="usuario"
+                autoComplete="username"
+              />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
+              />
+            </label>
+            <button type="submit" disabled={loading}>
+              {loading ? "Validando..." : "Entrar"}
+            </button>
+          </form>
+          {error && <p className="error">{error}</p>}
+        </section>
+      ) : (
+        <section className="panel dashboard">
+          <div className="panel-header">
+            <div>
+              <h2>Operaciones de backoffice</h2>
+              <p>{cards.length} cartas cargadas</p>
+            </div>
+            <div className="actions">
+              {activeTab === "cards" ? (
+                <>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    onClick={() => setShowCardModal(true)}
+                  >
+                    +
+                  </button>
+                  <button className="ghost" onClick={() => loadCards()} disabled={loading}>
+                    {loading ? "Actualizando..." : "Refrescar cartas"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    onClick={() => setShowTagModal(true)}
+                  >
+                    +
+                  </button>
+                  <button className="ghost" onClick={() => loadTags()}>
+                    Refrescar tags
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {error && <p className="error">{error}</p>}
+
+          {activeTab === "cards" ? (
+            <>
+              <div className="dashboard-grid">
+                <div className="panel-section" ref={editorRef}>
+                  <h3>Editor de cartas</h3>
+                  <label>
+                    Seleccionar carta
+                    <select
+                      value={selectedCardId}
+                      onChange={(event) =>
+                        setSelectedCardId(
+                          event.target.value ? Number(event.target.value) : ("" as const)
+                        )
+                      }
+                    >
+                      <option value="">Selecciona una carta</option>
+                      {cards.map((card) => (
+                        <option key={card.id} value={card.id}>
+                          {card.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {selectedCard ? (
+                    <div className="editor-grid">
+                      <div>
+                        <h4>Contenido (EN)</h4>
+                        <label>
+                          Titulo
+                          <input
+                            value={editorForm.title}
+                            onChange={(event) =>
+                              setEditorForm((prev) => ({ ...prev, title: event.target.value }))
+                            }
+                          />
+                        </label>
+                        <label>
+                          Descripcion
+                        <textarea
+                          className="description-field"
+                          value={editorForm.description}
+                          onChange={(event) =>
+                            setEditorForm((prev) => ({
+                              ...prev,
+                              description: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                        <div className="editor-actions">
+                          <button type="button" onClick={() => handleUpdateCardContent("en")}>
+                            Guardar EN
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4>Contenido (ES)</h4>
+                        <label>
+                          Titulo
+                          <input
+                            value={editorForm.title_es}
+                            onChange={(event) =>
+                              setEditorForm((prev) => ({ ...prev, title_es: event.target.value }))
+                            }
+                          />
+                        </label>
+                        <label>
+                          Descripcion
+                        <textarea
+                          className="description-field"
+                          value={editorForm.description_es}
+                          onChange={(event) =>
+                            setEditorForm((prev) => ({
+                              ...prev,
+                                description_es: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                        <div className="editor-actions">
+                          <button type="button" onClick={() => handleUpdateCardContent("es")}>
+                            Guardar ES
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4>Tags e intensidad</h4>
+                        <label>
+                          Intensidad
+                          <select
+                            value={editorForm.intensity}
+                            onChange={(event) =>
+                              setEditorForm((prev) => ({ ...prev, intensity: event.target.value }))
+                            }
+                          >
+                            {intensityOptions.map((option) => (
+                              <option key={option.slug} value={option.slug}>
+                                {getTagLabel(option)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <div className="tag-selector">
+                          <div className="tag-grid">
+                            {selectableTags.map((tag) => (
+                              <label key={tag.id} className="checkbox">
+                                <input
+                                  type="checkbox"
+                                  checked={editorForm.tags.includes(tag.slug)}
+                                  onChange={() =>
+                                    setEditorForm((prev) => ({
+                                      ...prev,
+                                      tags: toggleTag(prev.tags, tag.slug),
+                                    }))
+                                  }
+                                />
+                                <span>{getTagLabel(tag)}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="editor-actions">
+                          <button type="button" onClick={handleUpdateCardTags}>
+                            Guardar tags
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="muted">Selecciona una carta para editar contenido y tags.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="cards-grid">
+                {cards.map((card) => (
+                  <article
+                    key={card.id}
+                    className={card.is_enabled ? "card" : "card disabled"}
+                    onClick={() => setSelectedCardId(card.id)}
+                  >
+                    <header>
+                      <div>
+                        <h3>{card.title}</h3>
+                        <p className="meta">
+                          {card.category} · spice {card.spice_level} · diff {card.difficulty_level}
+                        </p>
+                      </div>
+                      <label className="toggle" onClick={(event) => event.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={card.is_enabled}
+                          onChange={(event) => toggleCard(card.id, event.target.checked)}
+                          onClick={(event) => event.stopPropagation()}
+                        />
+                        <span />
+                      </label>
+                    </header>
+                    <p className="description">{card.description}</p>
+                    <footer>
+                      <span>Creditos: {card.credit_value}</span>
+                      <span className="tag">{card.is_enabled ? "Activa" : "Desactivada"}</span>
+                    </footer>
+                  </article>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="panel-section">
+              <h3>Editor de tags</h3>
+              <div className="tag-list">
+                {tags.map((tag) => (
+                  <div key={tag.id} className="tag-row">
+                    <input
+                      value={tag.slug}
+                      onChange={(event) => updateTagField(tag.id, "slug", event.target.value)}
+                    />
+                    <input
+                      value={tag.name_es ?? ""}
+                      onChange={(event) => updateTagField(tag.id, "name_es", event.target.value)}
+                      placeholder="Nombre ES"
+                    />
+                    <input
+                      value={tag.name_en ?? ""}
+                      onChange={(event) => updateTagField(tag.id, "name_en", event.target.value)}
+                      placeholder="Nombre EN"
+                    />
+                    <select
+                      value={tag.tag_type}
+                      onChange={(event) => updateTagField(tag.id, "tag_type", event.target.value)}
+                    >
+                      <option value="category">category</option>
+                      <option value="intensity">intensity</option>
+                      <option value="subtag">subtag</option>
+                    </select>
+                    <input
+                      value={tag.parent_slug ?? ""}
+                      onChange={(event) =>
+                        updateTagField(tag.id, "parent_slug", event.target.value)
+                      }
+                      placeholder="parent"
+                    />
+                    <input
+                      type="number"
+                      value={tag.display_order}
+                      onChange={(event) =>
+                        updateTagField(tag.id, "display_order", Number(event.target.value))
+                      }
+                    />
+                    <div className="tag-actions">
+                      <button className="ghost" type="button" onClick={() => handleUpdateTag(tag)}>
+                        Guardar
+                      </button>
+                      <button
+                        className="danger"
+                        type="button"
+                        onClick={() => handleDeleteTag(tag.id)}
+                      >
+                        Borrar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {showCardModal && (
+            <div className="modal-overlay" onClick={() => setShowCardModal(false)}>
+              <div className="modal" onClick={(event) => event.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>Nueva carta</h3>
+                  <button className="ghost" type="button" onClick={() => setShowCardModal(false)}>
+                    Cerrar
+                  </button>
+                </div>
+                <form className="form-grid" onSubmit={handleCreateCard}>
+                  <label>
+                    Titulo (EN)
+                    <input
+                      value={createForm.title}
+                      onChange={(event) =>
+                        setCreateForm((prev) => ({ ...prev, title: event.target.value }))
+                      }
+                      required
+                    />
+                  </label>
+                  <label>
+                    Descripcion (EN)
+                    <textarea
+                      value={createForm.description}
+                      onChange={(event) =>
+                        setCreateForm((prev) => ({ ...prev, description: event.target.value }))
+                      }
+                      required
+                    />
+                  </label>
+                  <label>
+                    Titulo (ES)
+                    <input
+                      value={createForm.title_es}
+                      onChange={(event) =>
+                        setCreateForm((prev) => ({ ...prev, title_es: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Descripcion (ES)
+                    <textarea
+                      value={createForm.description_es}
+                      onChange={(event) =>
+                        setCreateForm((prev) => ({ ...prev, description_es: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Categoria
+                    <select
+                      value={createForm.category}
+                      onChange={(event) =>
+                        setCreateForm((prev) => ({ ...prev, category: event.target.value }))
+                      }
+                    >
+                      {CATEGORY_OPTIONS.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="inline-fields">
+                    <label>
+                      Spice
+                      <input
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={createForm.spice_level}
+                        onChange={(event) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            spice_level: Number(event.target.value),
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      Dificultad
+                      <input
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={createForm.difficulty_level}
+                        onChange={(event) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            difficulty_level: Number(event.target.value),
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      Creditos
+                      <input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={createForm.credit_value}
+                        onChange={(event) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            credit_value: Number(event.target.value),
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <label>
+                    Intensidad
+                    <select
+                      value={createForm.intensity}
+                      onChange={(event) =>
+                        setCreateForm((prev) => ({ ...prev, intensity: event.target.value }))
+                      }
+                    >
+                      {intensityOptions.map((option) => (
+                        <option key={option.slug} value={option.slug}>
+                          {getTagLabel(option)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="tag-selector">
+                    <p>Tags</p>
+                    <div className="tag-grid">
+                      {selectableTags.map((tag) => (
+                        <label key={tag.id} className="checkbox">
+                          <input
+                            type="checkbox"
+                            checked={createForm.tags.includes(tag.slug)}
+                            onChange={() =>
+                              setCreateForm((prev) => ({
+                                ...prev,
+                                tags: toggleTag(prev.tags, tag.slug),
+                              }))
+                            }
+                          />
+                          <span>{getTagLabel(tag)}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <button type="submit">Crear carta</button>
+                </form>
+              </div>
+            </div>
+          )}
+          {showTagModal && (
+            <div className="modal-overlay" onClick={() => setShowTagModal(false)}>
+              <div className="modal" onClick={(event) => event.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>Nuevo tag</h3>
+                  <button className="ghost" type="button" onClick={() => setShowTagModal(false)}>
+                    Cerrar
+                  </button>
+                </div>
+                <form className="form-grid" onSubmit={handleCreateTag}>
+                  <label>
+                    Slug
+                    <input
+                      value={tagForm.slug}
+                      onChange={(event) =>
+                        setTagForm((prev) => ({ ...prev, slug: event.target.value }))
+                      }
+                      required
+                    />
+                  </label>
+                  <label>
+                    Nombre (ES)
+                    <input
+                      value={tagForm.name_es}
+                      onChange={(event) =>
+                        setTagForm((prev) => ({ ...prev, name_es: event.target.value }))
+                      }
+                      required
+                    />
+                  </label>
+                  <label>
+                    Nombre (EN)
+                    <input
+                      value={tagForm.name_en}
+                      onChange={(event) =>
+                        setTagForm((prev) => ({ ...prev, name_en: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Tipo
+                    <select
+                      value={tagForm.tag_type}
+                      onChange={(event) =>
+                        setTagForm((prev) => ({ ...prev, tag_type: event.target.value }))
+                      }
+                    >
+                      <option value="category">category</option>
+                      <option value="intensity">intensity</option>
+                      <option value="subtag">subtag</option>
+                    </select>
+                  </label>
+                  <label>
+                    Parent
+                    <input
+                      value={tagForm.parent_slug}
+                      onChange={(event) =>
+                        setTagForm((prev) => ({ ...prev, parent_slug: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Orden
+                    <input
+                      type="number"
+                      value={tagForm.display_order}
+                      onChange={(event) =>
+                        setTagForm((prev) => ({
+                          ...prev,
+                          display_order: Number(event.target.value),
+                        }))
+                      }
+                    />
+                  </label>
+                  <button type="submit">Crear tag</button>
+                </form>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+    </div>
+  );
+}

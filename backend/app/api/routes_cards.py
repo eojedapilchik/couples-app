@@ -18,6 +18,9 @@ from app.schemas.card import (
     CardCreateAdmin,
 )
 from app.services.card_service import CardService
+from app.api.admin_access import require_admin_access
+from app.api.backoffice_dependencies import get_backoffice_user_optional
+from app.models.backoffice_user import BackofficeUser
 
 router = APIRouter()
 
@@ -205,7 +208,8 @@ def archive_card(
 
 @router.get("/admin/all", response_model=CardListResponse)
 def get_all_cards_for_admin(
-    user_id: int = Query(..., description="Admin user ID"),
+    user_id: int | None = Query(None, description="Admin user ID"),
+    backoffice_user: BackofficeUser | None = Depends(get_backoffice_user_optional),
     include_disabled: bool = Query(True, description="Include disabled cards"),
     locale: str | None = Query(None, description="Locale for translations (e.g., 'es', 'en')"),
     limit: int = Query(100, ge=1, le=500),
@@ -213,10 +217,7 @@ def get_all_cards_for_admin(
     db: Session = Depends(get_db),
 ):
     """Get all cards for admin management (requires admin user)."""
-    from app.models.user import User
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user or not user.is_admin:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden acceder")
+    require_admin_access(db, user_id, backoffice_user)
 
     cards_data, total = CardService.get_all_cards_for_admin(
         db, limit=limit, offset=offset, include_disabled=include_disabled, locale=locale
@@ -229,14 +230,12 @@ def get_all_cards_for_admin(
 def toggle_card_enabled(
     card_id: int,
     enabled: bool = Query(..., description="Enable or disable the card"),
-    user_id: int = Query(..., description="Admin user ID"),
+    user_id: int | None = Query(None, description="Admin user ID"),
+    backoffice_user: BackofficeUser | None = Depends(get_backoffice_user_optional),
     db: Session = Depends(get_db),
 ):
     """Toggle a card's enabled status (admin only)."""
-    from app.models.user import User
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user or not user.is_admin:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden modificar cartas")
+    require_admin_access(db, user_id, backoffice_user)
 
     card = CardService.toggle_card_enabled(db, card_id, enabled)
     if not card:
@@ -249,14 +248,12 @@ def toggle_card_enabled(
 def bulk_toggle_cards(
     card_ids: list[int] = Query(..., description="List of card IDs to toggle"),
     enabled: bool = Query(..., description="Enable or disable the cards"),
-    user_id: int = Query(..., description="Admin user ID"),
+    user_id: int | None = Query(None, description="Admin user ID"),
+    backoffice_user: BackofficeUser | None = Depends(get_backoffice_user_optional),
     db: Session = Depends(get_db),
 ):
     """Bulk enable/disable cards (admin only)."""
-    from app.models.user import User
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user or not user.is_admin:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden modificar cartas")
+    require_admin_access(db, user_id, backoffice_user)
 
     updated = CardService.bulk_toggle_cards(db, card_ids, enabled)
     return {"updated_count": updated, "is_enabled": enabled}
@@ -266,14 +263,12 @@ def bulk_toggle_cards(
 def update_card_tags(
     card_id: int,
     tags_update: CardTagsUpdate,
-    user_id: int = Query(..., description="Admin user ID"),
+    user_id: int | None = Query(None, description="Admin user ID"),
+    backoffice_user: BackofficeUser | None = Depends(get_backoffice_user_optional),
     db: Session = Depends(get_db),
 ):
     """Update a card's tags and intensity (admin only)."""
-    from app.models.user import User
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user or not user.is_admin:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden modificar cartas")
+    require_admin_access(db, user_id, backoffice_user)
 
     card_dict = CardService.update_card_tags(
         db, card_id, tags_update.tags, tags_update.intensity
@@ -288,14 +283,12 @@ def update_card_tags(
 def get_card_content(
     card_id: int,
     locale: str = Query("en", description="Locale: 'en' or 'es'"),
-    user_id: int = Query(..., description="Admin user ID"),
+    user_id: int | None = Query(None, description="Admin user ID"),
+    backoffice_user: BackofficeUser | None = Depends(get_backoffice_user_optional),
     db: Session = Depends(get_db),
 ):
     """Get card content for a specific locale (admin only)."""
-    from app.models.user import User
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user or not user.is_admin:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden acceder")
+    require_admin_access(db, user_id, backoffice_user)
 
     content = CardService.get_card_content_by_locale(db, card_id, locale)
     if not content:
@@ -308,14 +301,12 @@ def get_card_content(
 def update_card_content(
     card_id: int,
     content_update: CardContentUpdate,
-    user_id: int = Query(..., description="Admin user ID"),
+    user_id: int | None = Query(None, description="Admin user ID"),
+    backoffice_user: BackofficeUser | None = Depends(get_backoffice_user_optional),
     db: Session = Depends(get_db),
 ):
     """Update card title and description for a specific locale (admin only)."""
-    from app.models.user import User
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user or not user.is_admin:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden modificar cartas")
+    require_admin_access(db, user_id, backoffice_user)
 
     card = CardService.update_card_content(
         db, card_id, content_update.title, content_update.description, content_update.locale
@@ -333,14 +324,12 @@ def update_card_content(
 @router.post("/admin/create", response_model=CardResponse)
 def create_card_admin(
     card_data: CardCreateAdmin,
-    user_id: int = Query(..., description="Admin user ID"),
+    user_id: int | None = Query(None, description="Admin user ID"),
+    backoffice_user: BackofficeUser | None = Depends(get_backoffice_user_optional),
     db: Session = Depends(get_db),
 ):
     """Create a new card with optional Spanish translation (admin only)."""
-    from app.models.user import User
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user or not user.is_admin:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden crear cartas")
+    require_admin_access(db, user_id, backoffice_user)
 
     card = CardService.create_card_admin(
         db,
