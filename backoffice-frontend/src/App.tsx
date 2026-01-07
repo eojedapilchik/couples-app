@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Card, Tag } from "./types";
+import type { Card, Grouping, Tag } from "./types";
 
 const STORAGE_KEY = "backoffice_basic_token";
 
@@ -35,6 +35,9 @@ const parseCardTags = (tagsJson: string | null) => {
 const toggleTag = (tags: string[], slug: string) =>
   tags.includes(slug) ? tags.filter((t) => t !== slug) : [...tags, slug];
 
+const toggleId = (values: number[], id: number) =>
+  values.includes(id) ? values.filter((value) => value !== id) : [...values, id];
+
 const getTagLabel = (tag: Tag) => tag.name_es || tag.name || tag.slug;
 
 export default function App() {
@@ -43,11 +46,13 @@ export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem(STORAGE_KEY) || "");
   const [cards, setCards] = useState<Card[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [groupings, setGroupings] = useState<Grouping[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"cards" | "tags">("cards");
+  const [activeTab, setActiveTab] = useState<"cards" | "tags" | "groupings">("cards");
   const [showCardModal, setShowCardModal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
+  const [showGroupingModal, setShowGroupingModal] = useState(false);
   const editorRef = useRef<HTMLDivElement | null>(null);
 
   const [createForm, setCreateForm] = useState({
@@ -61,6 +66,7 @@ export default function App() {
     credit_value: 3,
     tags: [] as string[],
     intensity: "",
+    grouping_ids: [] as number[],
   });
 
   const [selectedCardId, setSelectedCardId] = useState<number | "">("");
@@ -71,6 +77,7 @@ export default function App() {
     description_es: "",
     tags: [] as string[],
     intensity: "",
+    grouping_ids: [] as number[],
   });
 
   const [tagForm, setTagForm] = useState({
@@ -79,6 +86,13 @@ export default function App() {
     name_en: "",
     tag_type: "category",
     parent_slug: "",
+    display_order: 0,
+  });
+
+  const [groupingForm, setGroupingForm] = useState({
+    slug: "",
+    name: "",
+    description: "",
     display_order: 0,
   });
 
@@ -98,10 +112,16 @@ export default function App() {
     [tags]
   );
 
+  const sortedGroupings = useMemo(
+    () => [...groupings].sort((a, b) => a.display_order - b.display_order),
+    [groupings]
+  );
+
   useEffect(() => {
     if (!isAuthed) return;
     loadCards(token);
     loadTags(token);
+    loadGroupings(token);
   }, [isAuthed, token]);
 
   useEffect(() => {
@@ -114,6 +134,7 @@ export default function App() {
       description_es: "",
       tags: parsed.tags,
       intensity: parsed.intensity,
+      grouping_ids: selectedCard.groupings_list?.map((grouping) => grouping.id) || [],
     });
     loadCardTranslation(selectedCard.id);
     if (editorRef.current) {
@@ -167,6 +188,7 @@ export default function App() {
     setToken("");
     setCards([]);
     setTags([]);
+    setGroupings([]);
   };
 
   const loadCards = async (authToken = token) => {
@@ -210,6 +232,24 @@ export default function App() {
       }
       const data = (await response.json()) as Tag[];
       setTags(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    }
+  };
+
+  const loadGroupings = async (authToken = token) => {
+    if (!authToken) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/groupings`, {
+        headers: {
+          ...getAuthHeaders(authToken),
+        },
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo cargar los groupings");
+      }
+      const data = (await response.json()) as Grouping[];
+      setGroupings(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error inesperado");
     }
@@ -282,6 +322,7 @@ export default function App() {
           description_es: createForm.description_es || null,
           tags: createForm.tags,
           intensity: createForm.intensity || "standard",
+          grouping_ids: createForm.grouping_ids,
           category: createForm.category,
           spice_level: createForm.spice_level,
           difficulty_level: createForm.difficulty_level,
@@ -302,6 +343,7 @@ export default function App() {
         credit_value: 3,
         tags: [],
         intensity: intensityOptions[0]?.slug || "standard",
+        grouping_ids: [],
       });
       await loadCards(token);
       setShowCardModal(false);
@@ -353,6 +395,29 @@ export default function App() {
       });
       if (!response.ok) {
         throw new Error("No se pudo actualizar los tags");
+      }
+      await loadCards(token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    }
+  };
+
+  const handleUpdateCardGroupings = async () => {
+    if (!token || !selectedCard) return;
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/cards/${selectedCard.id}/groupings`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(token),
+        },
+        body: JSON.stringify({
+          grouping_ids: editorForm.grouping_ids,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo actualizar los groupings");
       }
       await loadCards(token);
     } catch (err) {
@@ -455,6 +520,99 @@ export default function App() {
     );
   };
 
+  const handleCreateGrouping = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!token) return;
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/groupings`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(token),
+        },
+        body: JSON.stringify({
+          slug: groupingForm.slug,
+          name: groupingForm.name,
+          description: groupingForm.description || null,
+          display_order: groupingForm.display_order,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo crear el grouping");
+      }
+      setGroupingForm({
+        slug: "",
+        name: "",
+        description: "",
+        display_order: 0,
+      });
+      await loadGroupings(token);
+      setShowGroupingModal(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    }
+  };
+
+  const handleUpdateGrouping = async (grouping: Grouping) => {
+    if (!token) return;
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/groupings/${grouping.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(token),
+        },
+        body: JSON.stringify({
+          slug: grouping.slug,
+          name: grouping.name,
+          description: grouping.description || null,
+          display_order: grouping.display_order,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo actualizar el grouping");
+      }
+      await loadGroupings(token);
+      await loadCards(token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    }
+  };
+
+  const handleDeleteGrouping = async (groupingId: number) => {
+    if (!token) return;
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/groupings/${groupingId}`, {
+        method: "DELETE",
+        headers: {
+          ...getAuthHeaders(token),
+        },
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo eliminar el grouping");
+      }
+      await loadGroupings(token);
+      await loadCards(token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    }
+  };
+
+  const updateGroupingField = (
+    groupingId: number,
+    field: keyof Grouping,
+    value: string | number
+  ) => {
+    setGroupings((prev) =>
+      prev.map((grouping) =>
+        grouping.id === groupingId ? { ...grouping, [field]: value } : grouping
+      )
+    );
+  };
+
   return (
     <div className="page">
       <header className="hero">
@@ -462,7 +620,7 @@ export default function App() {
           <p className="eyebrow">Backoffice</p>
           <h1>Control Room</h1>
           <p className="subtitle">
-            Administra cartas, traducciones y tags. Acceso restringido a usuarios de backoffice.
+            Administra cartas, traducciones, tags y groupings. Acceso restringido a usuarios de backoffice.
           </p>
         </div>
         {isAuthed && (
@@ -479,6 +637,12 @@ export default function App() {
                 onClick={() => setActiveTab("tags")}
               >
                 Tags
+              </button>
+              <button
+                className={activeTab === "groupings" ? "tab active" : "tab"}
+                onClick={() => setActiveTab("groupings")}
+              >
+                Groupings
               </button>
             </div>
             <button className="ghost" onClick={handleLogout}>
@@ -528,7 +692,7 @@ export default function App() {
               <p>{cards.length} cartas cargadas</p>
             </div>
             <div className="actions">
-              {activeTab === "cards" ? (
+              {activeTab === "cards" && (
                 <>
                   <button
                     className="icon-button"
@@ -541,7 +705,8 @@ export default function App() {
                     {loading ? "Actualizando..." : "Refrescar cartas"}
                   </button>
                 </>
-              ) : (
+              )}
+              {activeTab === "tags" && (
                 <>
                   <button
                     className="icon-button"
@@ -552,6 +717,20 @@ export default function App() {
                   </button>
                   <button className="ghost" onClick={() => loadTags()}>
                     Refrescar tags
+                  </button>
+                </>
+              )}
+              {activeTab === "groupings" && (
+                <>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    onClick={() => setShowGroupingModal(true)}
+                  >
+                    +
+                  </button>
+                  <button className="ghost" onClick={() => loadGroupings()}>
+                    Refrescar groupings
                   </button>
                 </>
               )}
@@ -690,6 +869,37 @@ export default function App() {
                           </button>
                         </div>
                       </div>
+                      <div>
+                        <h4>Groupings</h4>
+                        {sortedGroupings.length === 0 ? (
+                          <p className="muted">No hay groupings disponibles.</p>
+                        ) : (
+                          <div className="tag-selector">
+                            <div className="tag-grid">
+                              {sortedGroupings.map((grouping) => (
+                                <label key={grouping.id} className="checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={editorForm.grouping_ids.includes(grouping.id)}
+                                    onChange={() =>
+                                      setEditorForm((prev) => ({
+                                        ...prev,
+                                        grouping_ids: toggleId(prev.grouping_ids, grouping.id),
+                                      }))
+                                    }
+                                  />
+                                  <span>{grouping.name}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div className="editor-actions">
+                          <button type="button" onClick={handleUpdateCardGroupings}>
+                            Guardar groupings
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <p className="muted">Selecciona una carta para editar contenido y tags.</p>
@@ -710,6 +920,11 @@ export default function App() {
                         <p className="meta">
                           {card.category} · spice {card.spice_level} · diff {card.difficulty_level}
                         </p>
+                        {card.groupings_list && card.groupings_list.length > 0 && (
+                          <p className="meta">
+                            Groupings: {card.groupings_list.map((grouping) => grouping.name).join(", ")}
+                          </p>
+                        )}
                       </div>
                       <label className="toggle" onClick={(event) => event.stopPropagation()}>
                         <input
@@ -730,7 +945,7 @@ export default function App() {
                 ))}
               </div>
             </>
-          ) : (
+          ) : activeTab === "tags" ? (
             <div className="panel-section">
               <h3>Editor de tags</h3>
               <div className="tag-list">
@@ -780,6 +995,63 @@ export default function App() {
                         className="danger"
                         type="button"
                         onClick={() => handleDeleteTag(tag.id)}
+                      >
+                        Borrar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="panel-section">
+              <h3>Editor de groupings</h3>
+              <div className="tag-list">
+                {sortedGroupings.map((grouping) => (
+                  <div key={grouping.id} className="tag-row">
+                    <input
+                      value={grouping.slug}
+                      onChange={(event) =>
+                        updateGroupingField(grouping.id, "slug", event.target.value)
+                      }
+                    />
+                    <input
+                      value={grouping.name}
+                      onChange={(event) =>
+                        updateGroupingField(grouping.id, "name", event.target.value)
+                      }
+                      placeholder="Nombre"
+                    />
+                    <input
+                      value={grouping.description ?? ""}
+                      onChange={(event) =>
+                        updateGroupingField(grouping.id, "description", event.target.value)
+                      }
+                      placeholder="Descripcion"
+                    />
+                    <input
+                      type="number"
+                      value={grouping.display_order}
+                      onChange={(event) =>
+                        updateGroupingField(
+                          grouping.id,
+                          "display_order",
+                          Number(event.target.value)
+                        )
+                      }
+                    />
+                    <div className="tag-actions">
+                      <button
+                        className="ghost"
+                        type="button"
+                        onClick={() => handleUpdateGrouping(grouping)}
+                      >
+                        Guardar
+                      </button>
+                      <button
+                        className="danger"
+                        type="button"
+                        onClick={() => handleDeleteGrouping(grouping.id)}
                       >
                         Borrar
                       </button>
@@ -934,6 +1206,30 @@ export default function App() {
                       ))}
                     </div>
                   </div>
+                  <div className="tag-selector">
+                    <p>Groupings</p>
+                    {sortedGroupings.length === 0 ? (
+                      <p className="muted">No hay groupings disponibles.</p>
+                    ) : (
+                      <div className="tag-grid">
+                        {sortedGroupings.map((grouping) => (
+                          <label key={grouping.id} className="checkbox">
+                            <input
+                              type="checkbox"
+                              checked={createForm.grouping_ids.includes(grouping.id)}
+                              onChange={() =>
+                                setCreateForm((prev) => ({
+                                  ...prev,
+                                  grouping_ids: toggleId(prev.grouping_ids, grouping.id),
+                                }))
+                              }
+                            />
+                            <span>{grouping.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <button type="submit">Crear carta</button>
                 </form>
               </div>
@@ -1014,6 +1310,67 @@ export default function App() {
                     />
                   </label>
                   <button type="submit">Crear tag</button>
+                </form>
+              </div>
+            </div>
+          )}
+          {showGroupingModal && (
+            <div className="modal-overlay" onClick={() => setShowGroupingModal(false)}>
+              <div className="modal" onClick={(event) => event.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>Nuevo grouping</h3>
+                  <button
+                    className="ghost"
+                    type="button"
+                    onClick={() => setShowGroupingModal(false)}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+                <form className="form-grid" onSubmit={handleCreateGrouping}>
+                  <label>
+                    Slug
+                    <input
+                      value={groupingForm.slug}
+                      onChange={(event) =>
+                        setGroupingForm((prev) => ({ ...prev, slug: event.target.value }))
+                      }
+                      required
+                    />
+                  </label>
+                  <label>
+                    Nombre
+                    <input
+                      value={groupingForm.name}
+                      onChange={(event) =>
+                        setGroupingForm((prev) => ({ ...prev, name: event.target.value }))
+                      }
+                      required
+                    />
+                  </label>
+                  <label>
+                    Descripcion
+                    <input
+                      value={groupingForm.description}
+                      onChange={(event) =>
+                        setGroupingForm((prev) => ({ ...prev, description: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Orden
+                    <input
+                      type="number"
+                      value={groupingForm.display_order}
+                      onChange={(event) =>
+                        setGroupingForm((prev) => ({
+                          ...prev,
+                          display_order: Number(event.target.value),
+                        }))
+                      }
+                    />
+                  </label>
+                  <button type="submit">Crear grouping</button>
                 </form>
               </div>
             </div>

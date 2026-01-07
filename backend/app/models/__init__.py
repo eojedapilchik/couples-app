@@ -7,6 +7,7 @@ from app.models.proposal import Proposal
 from app.models.credit import CreditBalance, CreditLedger
 from app.models.tag import Tag
 from app.models.backoffice_user import BackofficeUser
+from app.models.grouping import Grouping
 
 __all__ = [
     "User",
@@ -18,4 +19,5 @@ __all__ = [
     "CreditLedger",
     "Tag",
     "BackofficeUser",
+    "Grouping",
 ]

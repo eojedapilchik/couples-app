@@ -59,16 +59,13 @@ export default function CardLibrary() {
 
   // Build filter params from selected category
   const filterParams = useMemo(() => {
-    if (!selectedCategory) return { category: undefined, tags: undefined, excludeTags: undefined, intensity: undefined };
+    if (!selectedCategory) return { groupingSlug: undefined };
     return buildFilterParams(selectedCategory.filter);
   }, [selectedCategory]);
 
   // Fetch cards only when a category is selected
   const { cards, isLoading, error, voteOnCard } = useCards({
-    category: filterParams.category,
-    tags: filterParams.tags,
-    excludeTags: filterParams.excludeTags,
-    intensity: filterParams.intensity,
+    groupingSlug: filterParams.groupingSlug,
     unvotedOnly: true,
   });
 

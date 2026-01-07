@@ -1,30 +1,22 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { Card, CardCategory, PreferenceType, PartnerVotesResponse } from '../api/types';
+import type { Card, PreferenceType, PartnerVotesResponse } from '../api/types';
 import { cardsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { CATEGORIES, type CategoryDefinition } from '../config/categories';
 import { getApiLocale } from '../config/locale';
 
 interface UseCardsOptions {
-  category?: CardCategory;
-  tags?: string[];
-  excludeTags?: string[];
-  intensity?: string[];
+  groupingSlug?: string;
   unvotedOnly?: boolean;
 }
 
 export function useCards(options: UseCardsOptions = {}) {
-  const { category, tags, excludeTags, intensity, unvotedOnly = true } = options;
+  const { groupingSlug, unvotedOnly = true } = options;
   const { user, partner } = useAuth();
   const [cards, setCards] = useState<Card[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Serialize arrays for stable dependency comparison
-  const tagsKey = tags ? tags.join(',') : '';
-  const excludeTagsKey = excludeTags ? excludeTags.join(',') : '';
-  const intensityKey = intensity ? intensity.join(',') : '';
 
   // Track if we've already fetched to prevent double-fetching
   const fetchedRef = useRef<string | null>(null);
@@ -33,7 +25,7 @@ export function useCards(options: UseCardsOptions = {}) {
     if (!user) return;
 
     // Create a unique key for this fetch request
-    const fetchKey = `${user.id}-${partner?.id}-${category}-${tagsKey}-${excludeTagsKey}-${intensityKey}-${unvotedOnly}`;
+    const fetchKey = `${user.id}-${partner?.id}-${groupingSlug}-${unvotedOnly}`;
 
     // Skip if we already fetched with these exact parameters
     if (fetchedRef.current === fetchKey) return;
@@ -43,9 +35,7 @@ export function useCards(options: UseCardsOptions = {}) {
     setError(null);
     try {
       const response = await cardsApi.getCards({
-        category,
-        tags: tagsKey ? tagsKey.split(',') : undefined,
-        exclude_tags: excludeTagsKey ? excludeTagsKey.split(',') : undefined,
+        grouping_slug: groupingSlug,
         user_id: user.id,
         partner_id: partner?.id,
         unvoted_only: unvotedOnly,
@@ -53,9 +43,6 @@ export function useCards(options: UseCardsOptions = {}) {
         limit: 200,
       });
       let enabledCards = response.cards.filter((card) => card.is_enabled);
-      if (intensity && intensity.length > 0) {
-        enabledCards = enabledCards.filter((card) => matchesIntensity(card, intensity));
-      }
       setCards(enabledCards);
       setTotal(enabledCards.length);
     } catch (err) {
@@ -64,7 +51,7 @@ export function useCards(options: UseCardsOptions = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [user, partner, category, tagsKey, excludeTagsKey, intensityKey, unvotedOnly]);
+  }, [user, partner, groupingSlug, unvotedOnly]);
 
   useEffect(() => {
     fetchCards();
@@ -163,64 +150,12 @@ export function usePartnerVotes() {
 
 // Helper to check if a card matches a category filter
 function cardMatchesCategory(card: Card, category: CategoryDefinition): boolean {
-  const cardTags = getCardTagSlugs(card);
-  const intensity = getCardIntensity(card);
-  const resolvedIntensity = intensity || (card.category === 'calientes' ? 'estandar' : null);
-
-  if (category.filter.category && card.category !== category.filter.category) {
+  const groupingSlug = category.filter.groupingSlug;
+  if (!groupingSlug) {
     return false;
   }
 
-  // Check if card has any of the required tags
-  const hasTags = category.filter.tags
-    ? category.filter.tags.some(tag => cardTags.includes(tag))
-    : true;
-
-  // Check if card has any of the required intensity levels
-  const hasIntensity = category.filter.intensity
-    ? category.filter.intensity.includes(resolvedIntensity || '')
-    : true;
-
-  // Check if card has any excluded tags
-  const hasExcluded = category.filter.exclude
-    ? category.filter.exclude.some(tag => cardTags.includes(tag))
-    : false;
-
-  return hasTags && hasIntensity && !hasExcluded;
-}
-
-function matchesIntensity(card: Card, intensityFilters: string[]): boolean {
-  const intensity = getCardIntensity(card);
-  const resolvedIntensity = intensity || (card.category === 'calientes' ? 'estandar' : null);
-  if (!resolvedIntensity) return false;
-  return intensityFilters.includes(resolvedIntensity);
-}
-
-function getCardTagSlugs(card: Card): string[] {
-  if (card.tags_list && card.tags_list.length > 0) {
-    return card.tags_list.map(t => t.slug);
-  }
-  if (!card.tags) return [];
-  try {
-    const parsed = JSON.parse(card.tags);
-    return parsed.tags || [];
-  } catch {
-    return [];
-  }
-}
-
-function getCardIntensity(card: Card): string | null {
-  if (card.tags_list && card.tags_list.length > 0) {
-    const intensityTag = card.tags_list.find(t => t.tag_type === 'intensity');
-    if (intensityTag) return intensityTag.slug;
-  }
-  if (!card.tags) return null;
-  try {
-    const parsed = JSON.parse(card.tags);
-    return parsed.intensity || null;
-  } catch {
-    return null;
-  }
+  return card.groupings_list?.some((grouping) => grouping.slug === groupingSlug) ?? false;
 }
 
 export function useVotedCards() {

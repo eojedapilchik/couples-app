@@ -32,40 +32,23 @@ const preferenceIcons: Record<PreferenceType, { icon: React.ReactNode; color: st
   neutral: { icon: null, color: '#6B7280', bg: '#F3F4F6' },
 };
 
-// Helper to parse intensity from card.tags JSON
-function getCardIntensity(card: CardType): string | null {
-  if (card.tags_list && card.tags_list.length > 0) {
-    const intensityTag = card.tags_list.find(t => t.tag_type === 'intensity');
-    if (intensityTag) return intensityTag.slug;
-  }
-  if (!card.tags) return null;
-  try {
-    const parsed = JSON.parse(card.tags);
-    return parsed.intensity || null;
-  } catch {
-    return null;
-  }
-}
-
-// Helper to find which category a card belongs to
-function getCardCategory(card: CardType): CategoryDefinition | null {
-  const intensity = getCardIntensity(card);
-  const resolvedIntensity = intensity || (card.category === 'calientes' ? 'estandar' : null);
-
-  if (card.category !== 'calientes') {
-    return CATEGORIES.find(category => category.filter.category === card.category) || null;
+// Helper to find which categories a card belongs to (based on groupings)
+function getCardCategories(card: CardType): CategoryDefinition[] {
+  if (!card.groupings_list || card.groupings_list.length === 0) {
+    return [];
   }
 
-  // Calientes: group by intensity (fallback to estandar when missing)
-  if (resolvedIntensity) {
-    for (const category of CATEGORIES) {
-      if (category.filter.intensity?.includes(resolvedIntensity)) {
-        return category;
-      }
+  const categoryMap = new Map<string, CategoryDefinition>();
+  for (const grouping of card.groupings_list) {
+    const category = CATEGORIES.find(
+      (candidate) => candidate.filter.groupingSlug === grouping.slug
+    );
+    if (category) {
+      categoryMap.set(category.id, category);
     }
   }
 
-  return null;
+  return Array.from(categoryMap.values());
 }
 
 // Group cards by category
@@ -73,8 +56,8 @@ function groupCardsByCategory(cards: CardType[]): Map<CategoryDefinition, CardTy
   const groups = new Map<CategoryDefinition, CardType[]>();
 
   for (const card of cards) {
-    const category = getCardCategory(card);
-    if (category) {
+    const categories = getCardCategories(card);
+    for (const category of categories) {
       const existing = groups.get(category) || [];
       existing.push(card);
       groups.set(category, existing);

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.models.card import Card, PreferenceVote, CardCategory, CardStatus, PreferenceType, CardTranslation
 from app.models.tag import Tag
+from app.models.grouping import Grouping
 from app.models.user import User
 from app.utils.placeholders import replace_placeholders_in_card
 
@@ -48,6 +49,7 @@ class CardService:
         user_vote: PreferenceVote | None = None,
         partner_vote: PreferenceVote | None = None,
         include_tags_list: bool = False,
+        include_groupings_list: bool = False,
     ) -> dict:
         """Build a card response dict with optional translations and votes."""
         title, description = CardService._get_translated_text(db, card, locale)
@@ -70,12 +72,16 @@ class CardService:
         }
         if include_tags_list:
             card_dict["tags_list"] = CardService._get_card_tags(db, card.id, card)
+        if include_groupings_list:
+            card_dict["groupings_list"] = CardService._get_card_groupings(db, card.id, card)
         return card_dict
 
     @staticmethod
     def get_cards(
         db: Session,
         category: CardCategory | None = None,
+        grouping_slug: str | None = None,
+        grouping_id: int | None = None,
         status: CardStatus = CardStatus.ACTIVE,
         limit: int = 50,
         offset: int = 0,
@@ -87,6 +93,7 @@ class CardService:
         )
         if category:
             query = query.filter(Card.category == category)
+        query = CardService._apply_grouping_filter(query, grouping_slug, grouping_id)
         total = query.count()
         cards = query.order_by(Card.created_at.desc()).offset(offset).limit(limit).all()
         return cards, total
@@ -207,6 +214,15 @@ class CardService:
         return query
 
     @staticmethod
+    def _apply_grouping_filter(query, grouping_slug: str | None, grouping_id: int | None):
+        """Apply grouping filters to a card query."""
+        if grouping_id:
+            query = query.filter(Card.groupings.any(Grouping.id == grouping_id))
+        if grouping_slug:
+            query = query.filter(Card.groupings.any(Grouping.slug == grouping_slug))
+        return query
+
+    @staticmethod
     def _get_card_tags(db: Session, card_id: int, card: Card | None = None) -> list[dict]:
         """Get all tags for a card by parsing JSON and looking up in tags table."""
         import json
@@ -247,11 +263,32 @@ class CardService:
         ]
 
     @staticmethod
+    def _get_card_groupings(db: Session, card_id: int, card: Card | None = None) -> list[dict]:
+        """Get all groupings for a card."""
+        if card is None:
+            card = db.query(Card).filter(Card.id == card_id).first()
+        if not card:
+            return []
+        groupings = card.groupings
+        return [
+            {
+                "id": grouping.id,
+                "slug": grouping.slug,
+                "name": grouping.name,
+                "description": grouping.description,
+                "display_order": grouping.display_order,
+            }
+            for grouping in groupings
+        ]
+
+    @staticmethod
     def get_cards_with_preferences(
         db: Session,
         user_id: int,
         partner_id: int,
         category: CardCategory | None = None,
+        grouping_slug: str | None = None,
+        grouping_id: int | None = None,
         tags: list[str] | None = None,
         exclude_tags: list[str] | None = None,
         limit: int = 50,
@@ -275,6 +312,7 @@ class CardService:
 
         # Apply tag filters
         query = CardService._apply_tag_filters(db, query, tags, exclude_tags)
+        query = CardService._apply_grouping_filter(query, grouping_slug, grouping_id)
 
         # Filter based on vote status
         voted_card_ids = db.query(PreferenceVote.card_id).filter(
@@ -307,6 +345,7 @@ class CardService:
                 user_vote=user_vote,
                 partner_vote=partner_vote,
                 include_tags_list=True,
+                include_groupings_list=True,
             )
             # Replace placeholders with actual names
             card_dict = replace_placeholders_in_card(card_dict, user, partner)
@@ -338,7 +377,9 @@ class CardService:
             Card.status == CardStatus.ACTIVE,
         ).all()
         return [
-            CardService._build_card_dict(db, card, locale=locale)
+            CardService._build_card_dict(
+                db, card, locale=locale, include_groupings_list=True
+            )
             for card in cards
         ]
 
@@ -406,6 +447,7 @@ class CardService:
                 user_vote=user_vote,
                 partner_vote=partner_vote,
                 include_tags_list=True,
+                include_groupings_list=True,
             )
             # Replace placeholders with actual names
             card_dict = replace_placeholders_in_card(card_dict, user, partner)
@@ -451,6 +493,7 @@ class CardService:
                 card,
                 locale=locale,
                 include_tags_list=True,
+                include_groupings_list=True,
             )
             result.append(card_dict)
 
@@ -490,7 +533,32 @@ class CardService:
         db.refresh(card)
 
         # Return full card dict with tags_list (parsed from JSON)
-        return CardService._build_card_dict(db, card, locale="es", include_tags_list=True)
+        return CardService._build_card_dict(
+            db, card, locale="es", include_tags_list=True, include_groupings_list=True
+        )
+
+    @staticmethod
+    def update_card_groupings(
+        db: Session,
+        card_id: int,
+        grouping_ids: list[int],
+    ) -> dict | None:
+        """Update a card's groupings."""
+        card = CardService.get_card(db, card_id)
+        if not card:
+            return None
+
+        groupings = []
+        if grouping_ids:
+            groupings = db.query(Grouping).filter(Grouping.id.in_(grouping_ids)).all()
+
+        card.groupings = groupings
+        db.commit()
+        db.refresh(card)
+
+        return CardService._build_card_dict(
+            db, card, locale="es", include_tags_list=True, include_groupings_list=True
+        )
 
     @staticmethod
     def update_card_content(
@@ -579,6 +647,7 @@ class CardService:
         description_es: str | None,
         tags: list[str],
         intensity: str,
+        grouping_ids: list[int],
         category: CardCategory,
         spice_level: int,
         difficulty_level: int,
@@ -608,6 +677,10 @@ class CardService:
         )
         db.add(card)
         db.flush()  # Get the card ID
+
+        if grouping_ids:
+            groupings = db.query(Grouping).filter(Grouping.id.in_(grouping_ids)).all()
+            card.groupings = groupings
 
         # Add Spanish translation if provided
         if title_es or description_es:

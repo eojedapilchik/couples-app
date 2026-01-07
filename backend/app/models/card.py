@@ -6,6 +6,7 @@ from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, Enum as SQLE
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.models.grouping import card_groupings
 
 
 class CardSource(str, Enum):
@@ -69,6 +70,9 @@ class Card(Base):
     proposals: Mapped[list["Proposal"]] = relationship("Proposal", back_populates="card")
     translations: Mapped[list["CardTranslation"]] = relationship(
         "CardTranslation", back_populates="card", cascade="all, delete-orphan"
+    )
+    groupings: Mapped[list["Grouping"]] = relationship(
+        "Grouping", secondary=card_groupings, back_populates="cards"
     )
     created_by: Mapped["User | None"] = relationship(
         "User", foreign_keys=[created_by_user_id]

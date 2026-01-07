@@ -87,6 +87,8 @@ export const tagsApi = {
 export const cardsApi = {
   getCards: async (params?: {
     category?: CardCategory;
+    grouping_slug?: string;
+    grouping_id?: number;
     user_id?: number;
     partner_id?: number;
     tags?: string[];

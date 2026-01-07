@@ -1,16 +1,10 @@
 /**
  * Category definitions for the card library.
- * Main categories are intensity-based for calientes.
- * Non-calientes use the card category directly.
+ * Each category maps to a grouping slug.
  */
 
-import type { CardCategory } from '../api/types';
-
 export interface CategoryFilter {
-  category?: CardCategory;   // Match card.category
-  tags?: string[];           // Include cards with ANY of these tags
-  intensity?: string[];      // Include cards with ANY of these intensity levels
-  exclude?: string[];        // Exclude cards with ANY of these tags
+  groupingSlug?: string;
 }
 
 export interface CategoryDefinition {
@@ -36,8 +30,7 @@ export const CATEGORIES: CategoryDefinition[] = [
       text: '#4A3728',
     },
     filter: {
-      category: 'calientes',
-      intensity: ['estandar', 'standard'],
+      groupingSlug: 'standard',
     },
     order: 1,
   },
@@ -50,8 +43,7 @@ export const CATEGORIES: CategoryDefinition[] = [
       text: '#7F1D1D',
     },
     filter: {
-      category: 'calientes',
-      intensity: ['picante', 'spicy'],
+      groupingSlug: 'spicy',
     },
     order: 2,
   },
@@ -64,8 +56,7 @@ export const CATEGORIES: CategoryDefinition[] = [
       text: '#FFFFFF',
     },
     filter: {
-      category: 'calientes',
-      intensity: ['muy_picante', 'very_spicy'],
+      groupingSlug: 'very_spicy',
     },
     order: 3,
   },
@@ -78,8 +69,7 @@ export const CATEGORIES: CategoryDefinition[] = [
       text: '#F9FAFB',
     },
     filter: {
-      category: 'calientes',
-      intensity: ['extreme'],
+      groupingSlug: 'extreme',
     },
     order: 4,
   },
@@ -94,7 +84,7 @@ export const CATEGORIES: CategoryDefinition[] = [
       text: '#6B3A5B',
     },
     filter: {
-      category: 'romance',
+      groupingSlug: 'romance',
     },
     order: 5,
   },
@@ -107,7 +97,7 @@ export const CATEGORIES: CategoryDefinition[] = [
       text: '#78350F',
     },
     filter: {
-      category: 'risas',
+      groupingSlug: 'risas',
     },
     order: 6,
   },
@@ -120,7 +110,7 @@ export const CATEGORIES: CategoryDefinition[] = [
       text: '#3730A3',
     },
     filter: {
-      category: 'otras',
+      groupingSlug: 'otras',
     },
     order: 7,
   },
@@ -133,28 +123,9 @@ export function getCategoryById(id: string): CategoryDefinition | undefined {
 
 // Helper to build API query params from a category filter
 export function buildFilterParams(filter: CategoryFilter): {
-  category?: CardCategory;
-  tags?: string[];
-  excludeTags?: string[];
-  intensity?: string[];
+  groupingSlug?: string;
 } {
-  const tags: string[] = [];
-  const excludeTags: string[] = [];
-
-  // Add category tags
-  if (filter.tags) {
-    tags.push(...filter.tags);
-  }
-
-  // Add excluded tags
-  if (filter.exclude) {
-    excludeTags.push(...filter.exclude);
-  }
-
   return {
-    category: filter.category,
-    tags: tags.length > 0 ? tags : undefined,
-    excludeTags: excludeTags.length > 0 ? excludeTags : undefined,
-    intensity: filter.intensity,
+    groupingSlug: filter.groupingSlug,
   };
 }

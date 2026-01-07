@@ -14,6 +14,7 @@ from app.schemas.card import (
     PreferenceVoteResponse,
     PartnerVotesResponse,
     CardTagsUpdate,
+    CardGroupingsUpdate,
     CardContentUpdate,
     CardCreateAdmin,
 )
@@ -28,6 +29,8 @@ router = APIRouter()
 @router.get("", response_model=CardListResponse)
 def get_cards(
     category: CardCategory | None = None,
+    grouping_slug: str | None = Query(None, description="Grouping slug to include"),
+    grouping_id: int | None = Query(None, description="Grouping ID to include"),
     user_id: int | None = Query(None, description="Current user ID for preferences"),
     partner_id: int | None = Query(None, description="Partner ID for preferences"),
     tags: str | None = Query(None, description="Comma-separated tag slugs to include (OR logic)"),
@@ -48,6 +51,7 @@ def get_cards(
         # Return cards with preference info
         cards_data, total = CardService.get_cards_with_preferences(
             db, user_id, partner_id, category=category,
+            grouping_slug=grouping_slug, grouping_id=grouping_id,
             tags=tags_list, exclude_tags=exclude_tags_list,
             limit=limit, offset=offset, unvoted_only=unvoted_only,
             voted_only=voted_only, locale=locale
@@ -56,11 +60,14 @@ def get_cards(
     else:
         # Return plain cards (without tag filtering for now)
         cards_orm, total = CardService.get_cards(
-            db, category=category, limit=limit, offset=offset
+            db, category=category, grouping_slug=grouping_slug, grouping_id=grouping_id,
+            limit=limit, offset=offset
         )
         cards = [
             CardResponse(
-                **CardService._build_card_dict(db, card, locale=locale, include_tags_list=True)
+                **CardService._build_card_dict(
+                    db, card, locale=locale, include_tags_list=True, include_groupings_list=True
+                )
             )
             for card in cards_orm
         ]
@@ -279,6 +286,26 @@ def update_card_tags(
     return card_dict
 
 
+@router.patch("/{card_id}/groupings")
+def update_card_groupings(
+    card_id: int,
+    groupings_update: CardGroupingsUpdate,
+    user_id: int | None = Query(None, description="Admin user ID"),
+    backoffice_user: BackofficeUser | None = Depends(get_backoffice_user_optional),
+    db: Session = Depends(get_db),
+):
+    """Update a card's groupings (admin only)."""
+    require_admin_access(db, user_id, backoffice_user)
+
+    card_dict = CardService.update_card_groupings(
+        db, card_id, groupings_update.grouping_ids
+    )
+    if not card_dict:
+        raise HTTPException(status_code=404, detail="Carta no encontrada")
+
+    return card_dict
+
+
 @router.get("/{card_id}/content")
 def get_card_content(
     card_id: int,
@@ -339,6 +366,7 @@ def create_card_admin(
         description_es=card_data.description_es,
         tags=card_data.tags,
         intensity=card_data.intensity,
+        grouping_ids=card_data.grouping_ids,
         category=card_data.category,
         spice_level=card_data.spice_level,
         difficulty_level=card_data.difficulty_level,

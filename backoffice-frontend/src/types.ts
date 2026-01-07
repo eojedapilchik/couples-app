@@ -9,6 +9,16 @@ export type Tag = {
   display_order: number;
 };
 
+export type Grouping = {
+  id: number;
+  slug: string;
+  name: string;
+  description?: string | null;
+  display_order: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type Card = {
   id: number;
   title: string;
@@ -20,4 +30,5 @@ export type Card = {
   tags: string | null;
   is_enabled: boolean;
   tags_list?: Tag[];
+  groupings_list?: Grouping[];
 };

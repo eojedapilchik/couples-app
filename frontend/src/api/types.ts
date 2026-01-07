@@ -59,6 +59,15 @@ export interface TagsGroupedResponse {
   subtags: Tag[];
 }
 
+// Grouping
+export interface Grouping {
+  id: number;
+  slug: string;
+  name: string;
+  description?: string | null;
+  display_order: number;
+}
+
 // Card
 export interface Card {
   id: number;
@@ -70,6 +79,7 @@ export interface Card {
   credit_value: number;
   tags: string | null;
   tags_list?: Tag[];
+  groupings_list?: Grouping[];
   source: CardSource;
   status: CardStatus;
   is_enabled: boolean;
@@ -261,6 +271,7 @@ export interface CardCreateAdmin {
   description_es?: string | null;
   tags: string[];
   intensity: string;
+  grouping_ids?: number[];
   category: CardCategory;
   spice_level: number;
   difficulty_level: number;

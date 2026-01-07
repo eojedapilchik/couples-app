@@ -10,12 +10,14 @@ from app.api.routes_credits import router as credits_router
 from app.api.routes_admin import router as admin_router
 from app.api.routes_backoffice import router as backoffice_router
 from app.api.routes_tags import router as tags_router
+from app.api.routes_groupings import router as groupings_router
 
 api_router = APIRouter()
 
 api_router.include_router(auth_router, prefix="/auth", tags=["auth"])
 api_router.include_router(cards_router, prefix="/cards", tags=["cards"])
 api_router.include_router(tags_router, prefix="/tags", tags=["tags"])
+api_router.include_router(groupings_router, prefix="/groupings", tags=["groupings"])
 api_router.include_router(proposals_router, prefix="/proposals", tags=["proposals"])
 api_router.include_router(periods_router, prefix="/periods", tags=["periods"])
 api_router.include_router(credits_router, prefix="/credits", tags=["credits"])

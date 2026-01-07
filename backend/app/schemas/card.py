@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from app.models.card import CardCategory, CardSource, CardStatus, PreferenceType
 from app.schemas.tag import TagResponse
+from app.schemas.grouping import GroupingResponse
 
 
 class CardBase(BaseModel):
@@ -34,6 +35,7 @@ class CardResponse(CardBase):
     partner_preference: PreferenceType | None = None
     # Tags assigned to this card
     tags_list: list[TagResponse] = []
+    groupings_list: list[GroupingResponse] = []
 
     model_config = {"from_attributes": True}
 
@@ -79,6 +81,11 @@ class CardTagsUpdate(BaseModel):
     intensity: str = Field(..., description="Intensity level: standard, spicy, very_spicy, extreme")
 
 
+class CardGroupingsUpdate(BaseModel):
+    """Request to update card groupings."""
+    grouping_ids: list[int] = Field(default_factory=list, description="List of grouping IDs")
+
+
 class CardContentUpdate(BaseModel):
     """Request to update card title and description with locale support."""
     title: str = Field(..., min_length=1, max_length=500)
@@ -94,6 +101,7 @@ class CardCreateAdmin(BaseModel):
     description_es: str | None = Field(None, description="Spanish description")
     tags: list[str] = Field(default_factory=list, description="List of tag slugs")
     intensity: str = Field(default="standard", description="Intensity level")
+    grouping_ids: list[int] = Field(default_factory=list, description="List of grouping IDs")
     category: CardCategory = CardCategory.CALIENTES
     spice_level: int = Field(default=1, ge=1, le=5)
     difficulty_level: int = Field(default=1, ge=1, le=5)
