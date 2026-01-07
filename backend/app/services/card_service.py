@@ -86,6 +86,7 @@ class CardService:
         category: CardCategory | None = None,
         grouping_slug: str | None = None,
         grouping_id: int | None = None,
+        is_challenge: bool | None = None,
         status: CardStatus = CardStatus.ACTIVE,
         limit: int = 50,
         offset: int = 0,
@@ -97,6 +98,8 @@ class CardService:
         )
         if category:
             query = query.filter(Card.category == category)
+        if is_challenge is not None:
+            query = query.filter(Card.is_challenge == is_challenge)
         query = CardService._apply_grouping_filter(query, grouping_slug, grouping_id)
         total = query.count()
         cards = query.order_by(Card.created_at.desc()).offset(offset).limit(limit).all()
@@ -308,6 +311,7 @@ class CardService:
         category: CardCategory | None = None,
         grouping_slug: str | None = None,
         grouping_id: int | None = None,
+        is_challenge: bool | None = None,
         tags: list[str] | None = None,
         exclude_tags: list[str] | None = None,
         limit: int = 50,
@@ -328,6 +332,8 @@ class CardService:
         )
         if category:
             query = query.filter(Card.category == category)
+        if is_challenge is not None:
+            query = query.filter(Card.is_challenge == is_challenge)
 
         # Apply tag filters
         query = CardService._apply_tag_filters(db, query, tags, exclude_tags)

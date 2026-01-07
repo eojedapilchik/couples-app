@@ -36,6 +36,7 @@ def get_cards(
     grouping_id: int | None = Query(None, description="Grouping ID to include"),
     user_id: int | None = Query(None, description="Current user ID for preferences"),
     partner_id: int | None = Query(None, description="Partner ID for preferences"),
+    is_challenge: bool | None = Query(None, description="Filter by challenge cards"),
     tags: str | None = Query(None, description="Comma-separated tag slugs to include (OR logic)"),
     exclude_tags: str | None = Query(None, description="Comma-separated tag slugs to exclude"),
     unvoted_only: bool = Query(False, description="Only return cards user hasn't voted on"),
@@ -55,7 +56,7 @@ def get_cards(
         cards_data, total = CardService.get_cards_with_preferences(
             db, user_id, partner_id, category=category,
             grouping_slug=grouping_slug, grouping_id=grouping_id,
-            tags=tags_list, exclude_tags=exclude_tags_list,
+            tags=tags_list, exclude_tags=exclude_tags_list, is_challenge=is_challenge,
             limit=limit, offset=offset, unvoted_only=unvoted_only,
             voted_only=voted_only, locale=locale
         )
@@ -64,7 +65,7 @@ def get_cards(
         # Return plain cards (without tag filtering for now)
         cards_orm, total = CardService.get_cards(
             db, category=category, grouping_slug=grouping_slug, grouping_id=grouping_id,
-            limit=limit, offset=offset
+            limit=limit, offset=offset, is_challenge=is_challenge
         )
         cards = [
             CardResponse(

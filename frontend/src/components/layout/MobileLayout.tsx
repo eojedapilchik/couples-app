@@ -54,10 +54,97 @@ export default function MobileLayout({
     navigate('/login');
   };
 
+  const backgroundTheme = (() => {
+    if (location.pathname.startsWith('/cards')) {
+      return {
+        top: '#fff1e8',
+        mid: '#f7f1f0',
+        bottom: '#f3f4f6',
+        blob1: '#ffd9d9',
+        blob2: '#ffe3c6',
+      };
+    }
+    if (location.pathname.startsWith('/proposals')) {
+      return {
+        top: '#ffe4ee',
+        mid: '#f6eef3',
+        bottom: '#f3f4f6',
+        blob1: '#ffcfe1',
+        blob2: '#ffd9c2',
+      };
+    }
+    if (location.pathname.startsWith('/reports')) {
+      return {
+        top: '#ffeef2',
+        mid: '#f6f1f4',
+        bottom: '#f2f5f7',
+        blob1: '#ffd6e5',
+        blob2: '#ffeac9',
+      };
+    }
+    if (location.pathname.startsWith('/settings')) {
+      return {
+        top: '#fff0f6',
+        mid: '#f7f1f4',
+        bottom: '#f3f4f6',
+        blob1: '#ffd6e5',
+        blob2: '#ffeac9',
+      };
+    }
+    return {
+      top: '#ffe7f0',
+      mid: '#f6f1f4',
+      bottom: '#f3f4f6',
+      blob1: '#ffd6e5',
+      blob2: '#ffeac9',
+    };
+  })();
+
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh',
+        position: 'relative',
+        overflow: 'hidden',
+        background: `radial-gradient(circle at top, ${backgroundTheme.top} 0%, ${backgroundTheme.mid} 55%, ${backgroundTheme.bottom} 100%)`,
+        '&::before, &::after': {
+          content: '""',
+          position: 'absolute',
+          borderRadius: '999px',
+          opacity: 0.35,
+          zIndex: 0,
+          pointerEvents: 'none',
+        },
+        '&::before': {
+          width: { xs: 220, sm: 280 },
+          height: { xs: 220, sm: 280 },
+          background: backgroundTheme.blob1,
+          top: { xs: -80, sm: -110 },
+          right: { xs: '6vw', sm: '10vw' },
+        },
+        '&::after': {
+          width: { xs: 260, sm: 360 },
+          height: { xs: 260, sm: 360 },
+          background: backgroundTheme.blob2,
+          bottom: { xs: -90, sm: -130 },
+          left: { xs: '6vw', sm: '8vw' },
+        },
+      }}
+    >
       {/* App Bar */}
-      <AppBar position="fixed" color="default" elevation={0}>
+      <AppBar
+        position="fixed"
+        color="default"
+        elevation={0}
+        sx={{
+          zIndex: 2,
+          borderBottomLeftRadius: 10,
+          borderBottomRightRadius: 10,
+          overflow: 'hidden',
+        }}
+      >
         <Toolbar>
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
             {title}
@@ -83,7 +170,9 @@ export default function MobileLayout({
           flexGrow: 1,
           pt: '64px', // AppBar height
           pb: showNav ? '70px' : 0, // BottomNav height
-          bgcolor: 'background.default',
+          position: 'relative',
+          zIndex: 1,
+          bgcolor: 'transparent',
           overflow: 'auto',
           // Custom scrollbar - positioned on far right of viewport
           '&::-webkit-scrollbar': {
@@ -120,7 +209,16 @@ export default function MobileLayout({
       {/* Bottom Navigation */}
       {showNav && (
         <Paper
-          sx={{ position: 'fixed', bottom: 0, left: 0, right: 0 }}
+          sx={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 2,
+            bgcolor: 'rgba(255, 241, 248, 0.92)',
+            backdropFilter: 'blur(10px)',
+            borderTop: '1px solid rgba(233, 30, 99, 0.12)',
+          }}
           elevation={3}
         >
           <BottomNavigation

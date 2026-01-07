@@ -111,6 +111,41 @@ export function useLikedByBoth() {
   return { cards, isLoading, error };
 }
 
+export function useChallengeCards() {
+  const { user, partner } = useAuth();
+  const [cards, setCards] = useState<Card[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchChallengeCards = useCallback(async () => {
+    if (!user) return;
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await cardsApi.getCards({
+        user_id: user.id,
+        partner_id: partner?.id,
+        is_challenge: true,
+        locale: getApiLocale(),
+        limit: 500,
+      });
+      const enabledCards = response.cards.filter((card) => card.is_enabled);
+      setCards(enabledCards);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar cartas');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, partner]);
+
+  useEffect(() => {
+    fetchChallengeCards();
+  }, [fetchChallengeCards]);
+
+  return { cards, isLoading, error, refetch: fetchChallengeCards };
+}
+
 export function usePartnerVotes() {
   const { user, partner } = useAuth();
   const [data, setData] = useState<PartnerVotesResponse | null>(null);

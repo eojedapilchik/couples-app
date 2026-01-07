@@ -26,7 +26,7 @@ import MobileLayout from '../components/layout/MobileLayout';
 import ProposalCard from '../components/ProposalCard';
 import ChallengeWizard from '../components/ChallengeWizard';
 import { useProposals } from '../hooks/useProposals';
-import { useLikedByBoth } from '../hooks/useCards';
+import { useChallengeCards } from '../hooks/useCards';
 import { useActivePeriod } from '../hooks/usePeriods';
 import { useAuth } from '../context/AuthContext';
 import type { ProposalStatus, Card, Proposal, ProposalCreate, ProposalUpdate } from '../api/types';
@@ -59,19 +59,19 @@ export default function Proposals() {
     refetch,
   } = useProposals(tab === 'received');
 
-  const { cards: likedCards, isLoading: cardsLoading } = useLikedByBoth();
+  const { cards: challengeCards, isLoading: cardsLoading, error: cardsError } = useChallengeCards();
   const { period } = useActivePeriod();
 
   // Filter cards by search query
   const filteredCards = useMemo(() => {
-    if (!cardSearch.trim()) return likedCards;
+    if (!cardSearch.trim()) return challengeCards;
     const query = cardSearch.toLowerCase().trim();
-    return likedCards.filter(
+    return challengeCards.filter(
       (card) =>
         card.title?.toLowerCase().includes(query) ||
         card.description?.toLowerCase().includes(query)
     );
-  }, [likedCards, cardSearch]);
+  }, [challengeCards, cardSearch]);
 
   const handleRespond = async (
     proposalId: number,
@@ -325,17 +325,19 @@ export default function Proposals() {
 
                 <Divider sx={{ my: 2 }}>
                   <Typography variant="caption" color="text.secondary">
-                    o elige de cartas favoritas
+                    o elige de retos disponibles
                   </Typography>
                 </Divider>
 
                 {cardsLoading ? (
                   <CircularProgress />
-                ) : likedCards.length === 0 ? (
+                ) : cardsError ? (
+                  <Alert severity="error" sx={{ mb: 2 }}>
+                    {cardsError}
+                  </Alert>
+                ) : challengeCards.length === 0 ? (
                   <Typography color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-                    No hay cartas que les gusten a ambos.
-                    <br />
-                    Voten en las cartas primero!
+                    No hay retos disponibles.
                   </Typography>
                 ) : (
                   <>
@@ -365,10 +367,47 @@ export default function Proposals() {
                             <ListItemButton
                               onClick={() => handleProposeCard(card)}
                               disabled={!period}
+                              sx={{
+                                alignItems: 'flex-start',
+                                mb: 1,
+                                borderRadius: 2,
+                                bgcolor: 'rgba(255, 255, 255, 0.85)',
+                                border: '1px solid rgba(233, 30, 99, 0.12)',
+                                boxShadow: '0 6px 16px rgba(15, 15, 30, 0.06)',
+                              }}
                             >
                               <ListItemText
-                                primary={card.title}
-                                secondary={STRINGS.cardLibrary.currencySuggested(card.category, card.credit_value)}
+                                primary={
+                                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                                    {card.title}
+                                  </Typography>
+                                }
+                                secondary={
+                                  <Box sx={{ mt: 0.5 }}>
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                      sx={{
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 2,
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden',
+                                      }}
+                                    >
+                                      {card.description}
+                                    </Typography>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                      sx={{ display: 'block', mt: 0.5 }}
+                                    >
+                                      {STRINGS.cardLibrary.currencySuggested(
+                                        card.category,
+                                        card.credit_value
+                                      )}
+                                    </Typography>
+                                  </Box>
+                                }
                               />
                             </ListItemButton>
                           </ListItem>

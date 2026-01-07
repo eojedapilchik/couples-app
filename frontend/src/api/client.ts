@@ -100,6 +100,7 @@ export const cardsApi = {
     grouping_id?: number;
     user_id?: number;
     partner_id?: number;
+    is_challenge?: boolean;
     tags?: string[];
     exclude_tags?: string[];
     unvoted_only?: boolean;
