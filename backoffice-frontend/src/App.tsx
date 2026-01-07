@@ -11,6 +11,8 @@ import {
   type SelectChangeEvent,
   TextField,
 } from "@mui/material";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { Card, Grouping, Tag } from "./types";
 
 const STORAGE_KEY = "backoffice_basic_token";
@@ -841,38 +843,44 @@ export default function App() {
                   {selectedCard ? (
                     <>
                       <div className="editor-grid">
-                        <div>
-                          <h4>Contenido (EN)</h4>
-                          <div className="stack">
-                            <TextField
-                              label="Titulo"
-                              value={editorForm.title}
+                      <div>
+                        <h4>Contenido (EN)</h4>
+                        <div className="stack">
+                          <TextField
+                            label="Titulo"
+                            value={editorForm.title}
                               onChange={(event) =>
                                 setEditorForm((prev) => ({ ...prev, title: event.target.value }))
                               }
                               size="small"
                               fullWidth
                             />
-                            <TextField
-                              label="Descripcion"
-                              value={editorForm.description}
-                              onChange={(event) =>
-                                setEditorForm((prev) => ({
-                                  ...prev,
-                                  description: event.target.value,
-                                }))
-                              }
+                          <TextField
+                            label="Descripcion"
+                            value={editorForm.description}
+                            onChange={(event) =>
+                              setEditorForm((prev) => ({
+                                ...prev,
+                                description: event.target.value,
+                              }))
+                            }
                             size="small"
                             fullWidth
                             multiline
                             minRows={2}
                           />
+                          <div className="markdown-preview">
+                            <p className="muted">Preview</p>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {editorForm.description || ""}
+                            </ReactMarkdown>
                           </div>
                         </div>
+                      </div>
 
                       <div>
                         <h4>Contenido (ES)</h4>
-                          <div className="stack">
+                        <div className="stack">
                             <TextField
                               label="Titulo"
                               value={editorForm.title_es}
@@ -882,21 +890,27 @@ export default function App() {
                               size="small"
                               fullWidth
                             />
-                            <TextField
-                              label="Descripcion"
-                              value={editorForm.description_es}
-                              onChange={(event) =>
-                                setEditorForm((prev) => ({
-                                  ...prev,
-                                  description_es: event.target.value,
-                                }))
-                              }
+                          <TextField
+                            label="Descripcion"
+                            value={editorForm.description_es}
+                            onChange={(event) =>
+                              setEditorForm((prev) => ({
+                                ...prev,
+                                description_es: event.target.value,
+                              }))
+                            }
                             size="small"
                             fullWidth
                             multiline
                             minRows={2}
                           />
+                          <div className="markdown-preview">
+                            <p className="muted">Preview</p>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {editorForm.description_es || ""}
+                            </ReactMarkdown>
                           </div>
+                        </div>
                       </div>
 
                       <div>
@@ -949,7 +963,8 @@ export default function App() {
                             size="small"
                             fullWidth
                             multiline
-                            minRows={3}
+                            minRows={2}
+                            maxRows={3}
                             disabled={editorForm.is_challenge}
                           />
                         </div>
@@ -1306,7 +1321,8 @@ export default function App() {
                     size="small"
                     fullWidth
                     multiline
-                    minRows={3}
+                    minRows={2}
+                    maxRows={3}
                     disabled={createForm.is_challenge}
                   />
                   <label>

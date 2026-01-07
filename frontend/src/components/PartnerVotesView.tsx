@@ -23,6 +23,7 @@ import type { Card as CardType, PreferenceType } from '../api/types';
 import { usePartnerVotes } from '../hooks/useCards';
 import { useAuth } from '../context/AuthContext';
 import { buildCategoriesFromGroupings, type CategoryDefinition } from '../config/categories';
+import MarkdownText from './MarkdownText';
 
 // Preference icons with refined colors
 const preferenceIcons: Record<PreferenceType, { icon: React.ReactNode; color: string; bg: string }> = {
@@ -182,17 +183,15 @@ function CategorySection({ category, cards }: CategorySectionProps) {
               >
                 <ListItemText
                   primary={
-                    <Typography
-                      variant="body2"
-                      sx={{
+                    <MarkdownText
+                      text={card.description}
+                      typographySx={{
                         pr: 1,
                         color: '#374151',
                         lineHeight: 1.5,
                         fontWeight: 400,
                       }}
-                    >
-                      {card.description}
-                    </Typography>
+                    />
                   }
                   secondary={
                     <Box sx={{ display: 'flex', gap: 0.75, mt: 1, alignItems: 'center' }}>

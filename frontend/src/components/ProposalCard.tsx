@@ -26,6 +26,7 @@ import {
 import type { Proposal, ProposalStatus, ChallengeType, RewardType } from '../api/types';
 import { getCategoryColor } from '../theme/theme';
 import { STRINGS, CURRENCY_NAME } from '../config';
+import MarkdownText from './MarkdownText';
 
 const challengeTypeLabels: Record<ChallengeType, { label: string; color: string }> = {
   simple: { label: 'Simple', color: '#4CAF50' },
@@ -194,9 +195,10 @@ export default function ProposalCard({
               {displayTitle}
             </Typography>
             {displayDescription && (
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                {displayDescription}
-              </Typography>
+              <MarkdownText
+                text={displayDescription}
+                typographySx={{ opacity: 0.9 }}
+              />
             )}
 
             {/* Guided/Custom: Why proposing */}

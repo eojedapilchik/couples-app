@@ -26,6 +26,7 @@ import {
 import type { Card as CardType, PreferenceType } from '../api/types';
 import { useVotedCards } from '../hooks/useCards';
 import { buildCategoriesFromGroupings, type CategoryDefinition } from '../config/categories';
+import MarkdownText from './MarkdownText';
 
 // Preference icons with refined colors
 const preferenceIcons: Record<PreferenceType, { icon: React.ReactNode; color: string; bg: string; label: string }> = {
@@ -209,17 +210,15 @@ function CategorySection({ category, cards, onProposeReto, onUndoVote }: Categor
               >
                 <ListItemText
                   primary={
-                    <Typography
-                      variant="body2"
-                      sx={{
+                    <MarkdownText
+                      text={card.description}
+                      typographySx={{
                         pr: 4,
                         color: '#374151',
                         lineHeight: 1.5,
                         fontWeight: 400,
                       }}
-                    >
-                      {card.description}
-                    </Typography>
+                    />
                   }
                   secondary={
                     <Box sx={{ display: 'flex', gap: 0.75, mt: 1, alignItems: 'center' }}>

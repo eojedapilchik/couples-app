@@ -8,6 +8,7 @@ import {
 import type { Card, CardCategory } from '../api/types';
 import { getCategoryColor } from '../theme/theme';
 import { CURRENCY_NAME_LOWER } from '../config';
+import MarkdownText from './MarkdownText';
 
 interface GameCardProps {
   card: Card;
@@ -137,15 +138,14 @@ export default function GameCard({
             },
           }}
         >
-          <Typography
-            sx={{
+          <MarkdownText
+            text={card.description}
+            typographySx={{
               fontSize: styles.descSize,
               lineHeight: 1.5,
               opacity: 0.95,
             }}
-          >
-            {card.description}
-          </Typography>
+          />
         </Box>
 
         {/* Bottom Row: Credits + Icon - Always visible */}

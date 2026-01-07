@@ -299,6 +299,29 @@ button.danger {
   border: 1px dashed rgba(233, 30, 99, 0.2);
 }
 
+.markdown-preview {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px dashed rgba(233, 30, 99, 0.18);
+  max-height: 160px;
+  overflow: auto;
+}
+
+.markdown-preview p {
+  margin: 0 0 8px;
+}
+
+.markdown-preview p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-preview ul,
+.markdown-preview ol {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
 .panel-section h3 {
   margin: 0;
 }
