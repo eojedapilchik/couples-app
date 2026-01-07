@@ -58,6 +58,10 @@ export default function App() {
   const [showCardModal, setShowCardModal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
   const [showGroupingModal, setShowGroupingModal] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; card: Card | null }>({
+    open: false,
+    card: null,
+  });
   const editorRef = useRef<HTMLDivElement | null>(null);
 
   const [createForm, setCreateForm] = useState({
@@ -670,6 +674,27 @@ export default function App() {
     );
   };
 
+  const handleDeleteCard = async () => {
+    if (!token || !deleteDialog.card) return;
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/cards/${deleteDialog.card.id}`, {
+        method: "DELETE",
+        headers: {
+          ...getAuthHeaders(token),
+        },
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo eliminar la carta");
+      }
+      setDeleteDialog({ open: false, card: null });
+      setSelectedCardId("");
+      await loadCards(token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    }
+  };
+
   return (
     <div className="page">
       <header className="hero">
@@ -847,7 +872,7 @@ export default function App() {
                             size="small"
                             fullWidth
                             multiline
-                            minRows={3}
+                            minRows={2}
                           />
                           </div>
                         </div>
@@ -876,7 +901,7 @@ export default function App() {
                             size="small"
                             fullWidth
                             multiline
-                            minRows={3}
+                            minRows={2}
                           />
                           </div>
                         </div>
@@ -962,6 +987,13 @@ export default function App() {
                       <div className="editor-actions">
                         <button type="button" onClick={handleSaveCardEdits}>
                           Guardar cambios
+                        </button>
+                        <button
+                          type="button"
+                          className="danger"
+                          onClick={() => setDeleteDialog({ open: true, card: selectedCard })}
+                        >
+                          Eliminar carta
                         </button>
                       </div>
                     </>
@@ -1442,6 +1474,41 @@ export default function App() {
                   </label>
                   <button type="submit">Crear grouping</button>
                 </form>
+              </div>
+            </div>
+          )}
+          {deleteDialog.open && deleteDialog.card && (
+            <div
+              className="modal-overlay"
+              onClick={() => setDeleteDialog({ open: false, card: null })}
+            >
+              <div className="modal" onClick={(event) => event.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>Confirmar eliminacion</h3>
+                  <button
+                    className="ghost"
+                    type="button"
+                    onClick={() => setDeleteDialog({ open: false, card: null })}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+                <p>
+                  Vas a eliminar la carta <strong>{deleteDialog.card.title}</strong>. Esta accion es
+                  irreversible.
+                </p>
+                <div className="editor-actions">
+                  <button
+                    className="ghost"
+                    type="button"
+                    onClick={() => setDeleteDialog({ open: false, card: null })}
+                  >
+                    Cancelar
+                  </button>
+                  <button className="danger" type="button" onClick={handleDeleteCard}>
+                    Eliminar
+                  </button>
+                </div>
               </div>
             </div>
           )}

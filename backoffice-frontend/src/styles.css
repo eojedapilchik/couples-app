@@ -358,6 +358,9 @@ button.danger {
 
 .editor-actions {
   margin-top: 12px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .muted {
