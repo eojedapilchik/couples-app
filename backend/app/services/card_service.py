@@ -779,15 +779,17 @@ class CardService:
         spice_level: int,
         difficulty_level: int,
         credit_value: int,
-        created_by_user_id: int,
+        created_by_user_id: int | None,
+        include_user_created: bool = True,
     ) -> Card:
         """Create a new card with optional Spanish translation (admin)."""
         import json
         from app.models.card import CardSource
 
         # Build tags JSON
+        final_tags = tags + ["user_created"] if include_user_created else tags
         tags_data = {
-            "tags": tags + ["user_created"],  # Add user_created tag
+            "tags": final_tags,
             "intensity": intensity,
         }
 

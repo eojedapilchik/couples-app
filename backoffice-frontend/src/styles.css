@@ -582,3 +582,43 @@ button.danger {
     padding: 20px;
   }
 }
+
+.csv-panel {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  justify-items: start;
+  align-items: start;
+}
+
+.csv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.csv-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-weight: 600;
+}
+
+.csv-errors {
+  background: #fff1f2;
+  border: 1px solid rgba(225, 29, 72, 0.2);
+  border-radius: 16px;
+  padding: 12px 16px;
+  color: #be123c;
+}
+
+.csv-errors ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.success {
+  color: #15803d;
+  font-weight: 600;
+}

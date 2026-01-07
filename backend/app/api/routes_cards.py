@@ -1,6 +1,6 @@
 """Card routes - CRUD and voting."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -20,6 +20,8 @@ from app.schemas.card import (
     CardCreateAdmin,
 )
 from app.services.card_service import CardService
+from app.services.card_csv_service import CardCsvService
+from app.schemas.card_csv import CardCsvPreviewResponse, CardCsvApplyResponse
 from app.api.admin_access import require_admin_access
 from app.api.backoffice_dependencies import get_backoffice_user_optional
 from app.models.backoffice_user import BackofficeUser
@@ -413,3 +415,60 @@ def create_card_admin(
 
     card_dict = CardService._build_card_dict(db, card, locale="es", include_tags_list=True)
     return CardResponse(**card_dict)
+
+
+@router.get("/admin/csv/export")
+def export_cards_csv(
+    user_id: int | None = Query(None, description="Admin user ID"),
+    backoffice_user: BackofficeUser | None = Depends(get_backoffice_user_optional),
+    include_disabled: bool = Query(True, description="Include disabled cards"),
+    db: Session = Depends(get_db),
+):
+    """Export cards to CSV (admin only)."""
+    require_admin_access(db, user_id, backoffice_user)
+    csv_text = CardCsvService.export_cards_csv(db, include_disabled=include_disabled)
+    return Response(
+        content=csv_text,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=cards_export.csv"},
+    )
+
+
+@router.post("/admin/csv/preview", response_model=CardCsvPreviewResponse)
+def preview_cards_csv(
+    file: UploadFile = File(...),
+    user_id: int | None = Query(None, description="Admin user ID"),
+    backoffice_user: BackofficeUser | None = Depends(get_backoffice_user_optional),
+    db: Session = Depends(get_db),
+):
+    """Preview CSV import (admin only)."""
+    require_admin_access(db, user_id, backoffice_user)
+    try:
+        content = file.file.read().decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=400, detail="CSV encoding must be UTF-8") from exc
+
+    _, errors, summary = CardCsvService.preview_import(db, content)
+    return CardCsvPreviewResponse(**summary, errors=errors)
+
+
+@router.post("/admin/csv/apply", response_model=CardCsvApplyResponse)
+def apply_cards_csv(
+    file: UploadFile = File(...),
+    user_id: int | None = Query(None, description="Admin user ID"),
+    backoffice_user: BackofficeUser | None = Depends(get_backoffice_user_optional),
+    db: Session = Depends(get_db),
+):
+    """Apply CSV import (admin only)."""
+    require_admin_access(db, user_id, backoffice_user)
+    try:
+        content = file.file.read().decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=400, detail="CSV encoding must be UTF-8") from exc
+
+    rows, errors, _summary = CardCsvService.preview_import(db, content)
+    if errors:
+        raise HTTPException(status_code=400, detail={"errors": errors})
+
+    result = CardCsvService.apply_import(db, rows, user_id)
+    return CardCsvApplyResponse(**result)

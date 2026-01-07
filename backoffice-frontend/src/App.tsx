@@ -74,6 +74,17 @@ export default function App() {
     open: false,
     card: null,
   });
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvPreview, setCsvPreview] = useState<{
+    total_rows: number;
+    to_create: number;
+    to_update: number;
+    to_delete: number;
+  } | null>(null);
+  const [csvErrors, setCsvErrors] = useState<string[]>([]);
+  const [csvMessage, setCsvMessage] = useState<string | null>(null);
+  const [csvLoading, setCsvLoading] = useState(false);
+  const [csvInputKey, setCsvInputKey] = useState(0);
   const editorRef = useRef<HTMLDivElement | null>(null);
 
   const [createForm, setCreateForm] = useState({
@@ -327,6 +338,132 @@ export default function App() {
       setGroupings(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error inesperado");
+    }
+  };
+
+  const handleCsvFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    setCsvFile(file);
+    setCsvPreview(null);
+    setCsvErrors([]);
+    setCsvMessage(null);
+  };
+
+  const handleExportCsv = async () => {
+    if (!token) return;
+    setCsvMessage(null);
+    setCsvErrors([]);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/cards/admin/csv/export?include_disabled=true`,
+        {
+          headers: {
+            ...getAuthHeaders(token),
+          },
+        }
+      );
+      if (!response.ok) {
+        throw new Error("No se pudo exportar el CSV");
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      link.download = `cards_export_${dateStamp}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setCsvErrors([err instanceof Error ? err.message : "Error inesperado"]);
+    }
+  };
+
+  const handleCsvPreview = async () => {
+    if (!token || !csvFile) return;
+    setCsvLoading(true);
+    setCsvErrors([]);
+    setCsvMessage(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", csvFile);
+      const response = await fetch(`${API_BASE_URL}/cards/admin/csv/preview`, {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(token),
+        },
+        body: formData,
+      });
+      if (!response.ok) {
+        const data = (await response.json()) as { detail?: { errors?: string[] } };
+        const errors = data.detail?.errors || ["No se pudo previsualizar el CSV"];
+        setCsvErrors(errors);
+        setCsvPreview(null);
+        return;
+      }
+      const data = (await response.json()) as {
+        total_rows: number;
+        to_create: number;
+        to_update: number;
+        to_delete: number;
+        errors?: string[];
+      };
+      setCsvPreview({
+        total_rows: data.total_rows,
+        to_create: data.to_create,
+        to_update: data.to_update,
+        to_delete: data.to_delete,
+      });
+      setCsvErrors(data.errors || []);
+    } catch (err) {
+      setCsvErrors([err instanceof Error ? err.message : "Error inesperado"]);
+      setCsvPreview(null);
+    } finally {
+      setCsvLoading(false);
+    }
+  };
+
+  const handleCsvApply = async () => {
+    if (!token || !csvFile || !csvPreview) return;
+    if (!window.confirm("Aplicar los cambios del CSV?")) {
+      return;
+    }
+    setCsvLoading(true);
+    setCsvErrors([]);
+    setCsvMessage(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", csvFile);
+      const response = await fetch(`${API_BASE_URL}/cards/admin/csv/apply`, {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(token),
+        },
+        body: formData,
+      });
+      if (!response.ok) {
+        const data = (await response.json()) as { detail?: { errors?: string[] } };
+        const errors = data.detail?.errors || ["No se pudo aplicar el CSV"];
+        setCsvErrors(errors);
+        return;
+      }
+      const result = (await response.json()) as {
+        created: number;
+        updated: number;
+        deleted: number;
+      };
+      setCsvMessage(
+        `Importacion completada. Nuevas: ${result.created}, actualizadas: ${result.updated}, eliminadas: ${result.deleted}.`
+      );
+      setCsvPreview(null);
+      setCsvFile(null);
+      setCsvInputKey((prev) => prev + 1);
+      await loadCards();
+    } catch (err) {
+      setCsvErrors([err instanceof Error ? err.message : "Error inesperado"]);
+    } finally {
+      setCsvLoading(false);
     }
   };
 
@@ -843,44 +980,44 @@ export default function App() {
                   {selectedCard ? (
                     <>
                       <div className="editor-grid">
-                      <div>
-                        <h4>Contenido (EN)</h4>
-                        <div className="stack">
-                          <TextField
-                            label="Titulo"
-                            value={editorForm.title}
+                        <div>
+                          <h4>Contenido (EN)</h4>
+                          <div className="stack">
+                            <TextField
+                              label="Titulo"
+                              value={editorForm.title}
                               onChange={(event) =>
                                 setEditorForm((prev) => ({ ...prev, title: event.target.value }))
                               }
                               size="small"
                               fullWidth
                             />
-                          <TextField
-                            label="Descripcion"
-                            value={editorForm.description}
-                            onChange={(event) =>
-                              setEditorForm((prev) => ({
-                                ...prev,
-                                description: event.target.value,
-                              }))
-                            }
-                            size="small"
-                            fullWidth
-                            multiline
-                            minRows={2}
-                          />
-                          <div className="markdown-preview">
-                            <p className="muted">Preview</p>
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {editorForm.description || ""}
-                            </ReactMarkdown>
+                            <TextField
+                              label="Descripcion"
+                              value={editorForm.description}
+                              onChange={(event) =>
+                                setEditorForm((prev) => ({
+                                  ...prev,
+                                  description: event.target.value,
+                                }))
+                              }
+                              size="small"
+                              fullWidth
+                              multiline
+                              minRows={2}
+                            />
+                            <div className="markdown-preview">
+                              <p className="muted">Preview</p>
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {editorForm.description || ""}
+                              </ReactMarkdown>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div>
-                        <h4>Contenido (ES)</h4>
-                        <div className="stack">
+                        <div>
+                          <h4>Contenido (ES)</h4>
+                          <div className="stack">
                             <TextField
                               label="Titulo"
                               value={editorForm.title_es}
@@ -890,88 +1027,73 @@ export default function App() {
                               size="small"
                               fullWidth
                             />
-                          <TextField
-                            label="Descripcion"
-                            value={editorForm.description_es}
-                            onChange={(event) =>
-                              setEditorForm((prev) => ({
-                                ...prev,
-                                description_es: event.target.value,
-                              }))
-                            }
-                            size="small"
-                            fullWidth
-                            multiline
-                            minRows={2}
-                          />
-                          <div className="markdown-preview">
-                            <p className="muted">Preview</p>
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {editorForm.description_es || ""}
-                            </ReactMarkdown>
+                            <TextField
+                              label="Descripcion"
+                              value={editorForm.description_es}
+                              onChange={(event) =>
+                                setEditorForm((prev) => ({
+                                  ...prev,
+                                  description_es: event.target.value,
+                                }))
+                              }
+                              size="small"
+                              fullWidth
+                              multiline
+                              minRows={2}
+                            />
+                            <div className="markdown-preview">
+                              <p className="muted">Preview</p>
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {editorForm.description_es || ""}
+                              </ReactMarkdown>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div>
-                        <h4>Tipo de carta</h4>
-                        <div className="stack">
-                          <FormControl size="small" fullWidth>
-                            <InputLabel>Tipo</InputLabel>
-                            <Select
-                              value={editorForm.is_challenge ? "challenge" : "question"}
-                              label="Tipo"
-                              onChange={(event) =>
-                                setEditorForm((prev) => ({
-                                  ...prev,
-                                  is_challenge: event.target.value === "challenge",
-                                }))
-                              }
-                            >
-                              <MenuItem value="question">Pregunta</MenuItem>
-                              <MenuItem value="challenge">Reto</MenuItem>
-                            </Select>
-                          </FormControl>
-                          <FormControl size="small" fullWidth disabled={editorForm.is_challenge}>
-                            <InputLabel>Question type</InputLabel>
-                            <Select
-                              value={editorForm.question_type || "single_select"}
-                              label="Question type"
-                              onChange={(event) =>
-                                setEditorForm((prev) => ({
-                                  ...prev,
-                                  question_type: event.target.value,
-                                }))
-                              }
-                            >
-                              {QUESTION_TYPE_OPTIONS.map((option) => (
-                                <MenuItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                          <TextField
-                            label="Question params (JSON)"
-                            value={editorForm.question_params}
-                            onChange={(event) =>
-                              setEditorForm((prev) => ({
-                                ...prev,
-                                question_params: event.target.value,
-                              }))
-                            }
-                            size="small"
-                            fullWidth
-                            multiline
-                            minRows={2}
-                            maxRows={3}
-                            disabled={editorForm.is_challenge}
-                          />
+                        <div>
+                          <h4>Tipo de carta</h4>
+                          <div className="stack">
+                            <FormControl size="small" fullWidth>
+                              <InputLabel>Tipo</InputLabel>
+                              <Select
+                                value={editorForm.is_challenge ? "challenge" : "question"}
+                                label="Tipo"
+                                onChange={(event) =>
+                                  setEditorForm((prev) => ({
+                                    ...prev,
+                                    is_challenge: event.target.value === "challenge",
+                                  }))
+                                }
+                              >
+                                <MenuItem value="question">Pregunta</MenuItem>
+                                <MenuItem value="challenge">Reto</MenuItem>
+                              </Select>
+                            </FormControl>
+                            <FormControl size="small" fullWidth disabled={editorForm.is_challenge}>
+                              <InputLabel>Question type</InputLabel>
+                              <Select
+                                value={editorForm.question_type || "single_select"}
+                                label="Question type"
+                                onChange={(event) =>
+                                  setEditorForm((prev) => ({
+                                    ...prev,
+                                    question_type: event.target.value,
+                                  }))
+                                }
+                              >
+                                {QUESTION_TYPE_OPTIONS.map((option) => (
+                                  <MenuItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                            {/* Question params field removed for now. */}
+                          </div>
                         </div>
-                      </div>
 
-                      <div>
-                        <h4>Tags e intensidad</h4>
+                        <div>
+                          <h4>Tags e intensidad</h4>
                           <div className="stack">
                             <FormControl size="small" fullWidth>
                               <InputLabel>Intensidad</InputLabel>
@@ -1015,6 +1137,7 @@ export default function App() {
                             </FormControl>
                           </div>
                         </div>
+
                         <div>
                           <h4>Groupings</h4>
                           {sortedGroupings.length === 0 ? (
@@ -1063,6 +1186,59 @@ export default function App() {
                     </>
                   ) : (
                     <p className="muted">Selecciona una carta para editar contenido y tags.</p>
+                  )}
+                </div>
+                <div className="panel-section csv-panel">
+                  <h3>Importar / Exportar CSV</h3>
+                  <p className="muted">
+                    Exporta para usar como plantilla. En importacion usa nombres o slugs para
+                    tags/groupings, separa por comas, y marca delete=1 para archivar. Para limpiar
+                    tags/groupings usa "clear" o "-".
+                  </p>
+                  <div className="csv-actions">
+                    <button type="button" className="ghost" onClick={handleExportCsv}>
+                      Exportar CSV
+                    </button>
+                    <input
+                      key={csvInputKey}
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={handleCsvFileChange}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCsvPreview}
+                      disabled={!csvFile || csvLoading}
+                    >
+                      {csvLoading ? "Procesando..." : "Previsualizar"}
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={handleCsvApply}
+                      disabled={!csvFile || !csvPreview || csvLoading || csvErrors.length > 0}
+                    >
+                      Aplicar cambios
+                    </button>
+                  </div>
+                  {csvPreview && (
+                    <div className="csv-summary">
+                      <span>Total filas: {csvPreview.total_rows}</span>
+                      <span>Nuevas: {csvPreview.to_create}</span>
+                      <span>Actualizar: {csvPreview.to_update}</span>
+                      <span>Eliminar: {csvPreview.to_delete}</span>
+                    </div>
+                  )}
+                  {csvMessage && <p className="success">{csvMessage}</p>}
+                  {csvErrors.length > 0 && (
+                    <div className="csv-errors">
+                      <p>Errores encontrados:</p>
+                      <ul>
+                        {csvErrors.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1309,22 +1485,7 @@ export default function App() {
                       ))}
                     </Select>
                   </FormControl>
-                  <TextField
-                    label="Question params (JSON)"
-                    value={createForm.question_params}
-                    onChange={(event) =>
-                      setCreateForm((prev) => ({
-                        ...prev,
-                        question_params: event.target.value,
-                      }))
-                    }
-                    size="small"
-                    fullWidth
-                    multiline
-                    minRows={2}
-                    maxRows={3}
-                    disabled={createForm.is_challenge}
-                  />
+                  {/* Question params field removed for now. */}
                   <label>
                     Categoria
                     <select
