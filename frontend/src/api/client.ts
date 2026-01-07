@@ -27,6 +27,7 @@ import type {
   CardContentUpdate,
   CardContentResponse,
   CardCreateAdmin,
+  Grouping,
 } from './types';
 
 // API base URL - use proxy in dev, direct in production
@@ -79,6 +80,14 @@ export const tagsApi = {
   },
   getTagsGrouped: async (): Promise<TagsGroupedResponse> => {
     const { data } = await api.get('/tags/grouped');
+    return data;
+  },
+};
+
+// Groupings
+export const groupingsApi = {
+  getGroupings: async (): Promise<Grouping[]> => {
+    const { data } = await api.get('/groupings');
     return data;
   },
 };

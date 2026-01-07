@@ -1,6 +1,6 @@
 import { Box, Card, CardActionArea, Typography, Chip } from '@mui/material';
 import { ChevronRight as ArrowIcon } from '@mui/icons-material';
-import { CATEGORIES, type CategoryDefinition } from '../config/categories';
+import type { CategoryDefinition } from '../config/categories';
 
 interface CategoryCardProps {
   category: CategoryDefinition;
@@ -119,13 +119,12 @@ function CategoryCard({ category, unvotedCount, onClick }: CategoryCardProps) {
 
 interface CategoryGridProps {
   onSelectCategory: (category: CategoryDefinition) => void;
-  categories?: CategoryDefinition[];
+  categories: CategoryDefinition[];
   unvotedCounts?: Record<string, number>;
 }
 
 export default function CategoryGrid({ onSelectCategory, categories, unvotedCounts }: CategoryGridProps) {
-  // Use provided categories or default to all, sorted by order
-  const sortedCategories = (categories || CATEGORIES).sort((a, b) => a.order - b.order);
+  const sortedCategories = [...categories].sort((a, b) => a.order - b.order);
 
   if (sortedCategories.length === 0) {
     return (
@@ -164,6 +163,4 @@ export default function CategoryGrid({ onSelectCategory, categories, unvotedCoun
   );
 }
 
-// Export categories for use in other components
-export { CATEGORIES };
 export type { CategoryDefinition };

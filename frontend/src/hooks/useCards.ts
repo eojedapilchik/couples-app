@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { Card, PreferenceType, PartnerVotesResponse } from '../api/types';
 import { cardsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { CATEGORIES, type CategoryDefinition } from '../config/categories';
+import type { CategoryDefinition } from '../config/categories';
 import { getApiLocale } from '../config/locale';
 
 interface UseCardsOptions {
@@ -214,7 +214,7 @@ export function useVotedCards() {
   };
 }
 
-export function useCategoryCounts() {
+export function useCategoryCounts(categories: CategoryDefinition[]) {
   const { user, partner } = useAuth();
   const [allCards, setAllCards] = useState<Card[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -250,18 +250,18 @@ export function useCategoryCounts() {
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
 
-    for (const category of CATEGORIES) {
+    for (const category of categories) {
       const matchingCards = allCards.filter(card => cardMatchesCategory(card, category));
       counts[category.id] = matchingCards.length;
     }
 
     return counts;
-  }, [allCards]);
+  }, [allCards, categories]);
 
   // Filter categories that have cards
   const categoriesWithCards = useMemo(() => {
-    return CATEGORIES.filter(cat => categoryCounts[cat.id] > 0);
-  }, [categoryCounts]);
+    return categories.filter(cat => categoryCounts[cat.id] > 0);
+  }, [categoryCounts, categories]);
 
   return {
     counts: categoryCounts,

@@ -25,7 +25,7 @@ import {
 } from '@mui/icons-material';
 import type { Card as CardType, PreferenceType } from '../api/types';
 import { useVotedCards } from '../hooks/useCards';
-import { CATEGORIES, type CategoryDefinition } from '../config/categories';
+import { buildCategoriesFromGroupings, type CategoryDefinition } from '../config/categories';
 
 // Preference icons with refined colors
 const preferenceIcons: Record<PreferenceType, { icon: React.ReactNode; color: string; bg: string; label: string }> = {
@@ -36,14 +36,17 @@ const preferenceIcons: Record<PreferenceType, { icon: React.ReactNode; color: st
 };
 
 // Helper to find which categories a card belongs to (based on groupings)
-function getCardCategories(card: CardType): CategoryDefinition[] {
+function getCardCategories(
+  card: CardType,
+  categories: CategoryDefinition[]
+): CategoryDefinition[] {
   if (!card.groupings_list || card.groupings_list.length === 0) {
     return [];
   }
 
   const categoryMap = new Map<string, CategoryDefinition>();
   for (const grouping of card.groupings_list) {
-    const category = CATEGORIES.find(
+    const category = categories.find(
       (candidate) => candidate.filter.groupingSlug === grouping.slug
     );
     if (category) {
@@ -55,12 +58,15 @@ function getCardCategories(card: CardType): CategoryDefinition[] {
 }
 
 // Group cards by category
-function groupCardsByCategory(cards: CardType[]): Map<CategoryDefinition, CardType[]> {
+function groupCardsByCategory(
+  cards: CardType[],
+  categories: CategoryDefinition[]
+): Map<CategoryDefinition, CardType[]> {
   const groups = new Map<CategoryDefinition, CardType[]>();
 
   for (const card of cards) {
-    const categories = getCardCategories(card);
-    for (const category of categories) {
+    const resolvedCategories = getCardCategories(card, categories);
+    for (const category of resolvedCategories) {
       const existing = groups.get(category) || [];
       existing.push(card);
       groups.set(category, existing);
@@ -245,17 +251,24 @@ function CategorySection({ category, cards, onProposeReto, onUndoVote }: Categor
 interface VotedCardsViewProps {
   onProposeReto?: (card: CardType) => void;
   onUndoVote?: () => void;
+  categories: CategoryDefinition[];
 }
 
-export default function VotedCardsView({ onProposeReto, onUndoVote }: VotedCardsViewProps) {
+export default function VotedCardsView({ onProposeReto, onUndoVote, categories }: VotedCardsViewProps) {
   const { cards, total, isLoading, error, undoVote } = useVotedCards();
+  const effectiveCategories =
+    categories.length > 0
+      ? categories
+      : buildCategoriesFromGroupings(
+          cards.flatMap((card) => card.groupings_list ?? [])
+        );
 
   // Group by category (using same categories as Votar tab)
   const cardsByCategory = useMemo(() => {
-    return groupCardsByCategory(cards);
-  }, [cards]);
+    return groupCardsByCategory(cards, effectiveCategories);
+  }, [cards, effectiveCategories]);
 
-  // Sort categories by order defined in CATEGORIES
+  // Sort categories by display order
   const sortedCategories = useMemo(() => {
     return Array.from(cardsByCategory.entries())
       .sort(([catA], [catB]) => catA.order - catB.order);

@@ -31,7 +31,8 @@ import { useActivePeriod } from '../hooks/usePeriods';
 import { useAuth } from '../context/AuthContext';
 import type { PreferenceType, Card } from '../api/types';
 import { STRINGS } from '../config';
-import { buildFilterParams } from '../config/categories';
+import { buildCategoriesFromGroupings, buildFilterParams } from '../config/categories';
+import { useGroupings } from '../hooks/useGroupings';
 
 export default function CardLibrary() {
   const [viewMode, setViewMode] = useState<'vote' | 'library' | 'partner'>('vote');
@@ -48,6 +49,11 @@ export default function CardLibrary() {
   const { partner } = useAuth();
   const { period } = useActivePeriod();
   const { createProposal } = useProposals();
+  const { groupings, isLoading: groupingsLoading, error: groupingsError } = useGroupings();
+  const categories = useMemo(
+    () => buildCategoriesFromGroupings(groupings),
+    [groupings]
+  );
 
   // Get category counts for filtering
   const {
@@ -55,7 +61,7 @@ export default function CardLibrary() {
     categoriesWithCards,
     isLoading: countsLoading,
     refetch: refetchCategoryCounts,
-  } = useCategoryCounts();
+  } = useCategoryCounts(categories);
 
   // Build filter params from selected category
   const filterParams = useMemo(() => {
@@ -191,10 +197,12 @@ export default function CardLibrary() {
         {/* Category Grid - shown in vote mode without selection */}
         {viewMode === 'vote' && !selectedCategory && (
           <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-            {countsLoading ? (
+            {countsLoading || groupingsLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                 <CircularProgress />
               </Box>
+            ) : groupingsError ? (
+              <Alert severity="error">{groupingsError}</Alert>
             ) : (
               <CategoryGrid
                 onSelectCategory={handleSelectCategory}
@@ -209,6 +217,7 @@ export default function CardLibrary() {
         {viewMode === 'library' && (
           <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
             <VotedCardsView
+              categories={categories}
               onProposeReto={handleProposeReto}
               onUndoVote={refetchCategoryCounts}
             />
@@ -218,7 +227,7 @@ export default function CardLibrary() {
         {/* Partner Votes View */}
         {viewMode === 'partner' && (
           <Box sx={{ flexGrow: 1, overflow: 'auto', px: 1 }}>
-            <PartnerVotesView />
+            <PartnerVotesView categories={categories} />
           </Box>
         )}
 

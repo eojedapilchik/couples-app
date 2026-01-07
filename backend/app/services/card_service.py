@@ -277,6 +277,8 @@ class CardService:
                 "name": grouping.name,
                 "description": grouping.description,
                 "display_order": grouping.display_order,
+                "created_at": grouping.created_at,
+                "updated_at": grouping.updated_at,
             }
             for grouping in groupings
         ]

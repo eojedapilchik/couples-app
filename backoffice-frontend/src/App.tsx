@@ -1,4 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Checkbox,
+  FormControl,
+  InputLabel,
+  ListItemText,
+  MenuItem,
+  OutlinedInput,
+  Select,
+  type SelectChangeEvent,
+  TextField,
+} from "@mui/material";
 import type { Card, Grouping, Tag } from "./types";
 
 const STORAGE_KEY = "backoffice_basic_token";
@@ -31,12 +42,6 @@ const parseCardTags = (tagsJson: string | null) => {
     return { tags: [] as string[], intensity: "" };
   }
 };
-
-const toggleTag = (tags: string[], slug: string) =>
-  tags.includes(slug) ? tags.filter((t) => t !== slug) : [...tags, slug];
-
-const toggleId = (values: number[], id: number) =>
-  values.includes(id) ? values.filter((value) => value !== id) : [...values, id];
 
 const getTagLabel = (tag: Tag) => tag.name_es || tag.name || tag.slug;
 
@@ -112,6 +117,11 @@ export default function App() {
     [tags]
   );
 
+  const tagLabelBySlug = useMemo(
+    () => new Map(selectableTags.map((tag) => [tag.slug, getTagLabel(tag)])),
+    [selectableTags]
+  );
+
   const sortedGroupings = useMemo(
     () => [...groupings].sort((a, b) => a.display_order - b.display_order),
     [groupings]
@@ -153,6 +163,42 @@ export default function App() {
       setEditorForm((prev) => ({ ...prev, intensity: intensityOptions[0].slug }));
     }
   }, [editorForm.intensity, intensityOptions]);
+
+  const handleEditorTagsChange = (event: SelectChangeEvent<string[]>) => {
+    const value = event.target.value;
+    setEditorForm((prev) => ({
+      ...prev,
+      tags: typeof value === "string" ? value.split(",") : value,
+    }));
+  };
+
+  const handleEditorGroupingsChange = (event: SelectChangeEvent<number[]>) => {
+    const value = event.target.value;
+    const ids =
+      typeof value === "string" ? value.split(",").map(Number) : value.map(Number);
+    setEditorForm((prev) => ({
+      ...prev,
+      grouping_ids: ids,
+    }));
+  };
+
+  const handleCreateTagsChange = (event: SelectChangeEvent<string[]>) => {
+    const value = event.target.value;
+    setCreateForm((prev) => ({
+      ...prev,
+      tags: typeof value === "string" ? value.split(",") : value,
+    }));
+  };
+
+  const handleCreateGroupingsChange = (event: SelectChangeEvent<number[]>) => {
+    const value = event.target.value;
+    const ids =
+      typeof value === "string" ? value.split(",").map(Number) : value.map(Number);
+    setCreateForm((prev) => ({
+      ...prev,
+      grouping_ids: ids,
+    }));
+  };
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -352,37 +398,53 @@ export default function App() {
     }
   };
 
-  const handleUpdateCardContent = async (locale: "en" | "es") => {
+  const handleSaveCardEdits = async () => {
     if (!token || !selectedCard) return;
     setError(null);
-    const payload =
-      locale === "en"
-        ? { title: editorForm.title, description: editorForm.description, locale }
-        : { title: editorForm.title_es, description: editorForm.description_es, locale };
-
     try {
-      const response = await fetch(`${API_BASE_URL}/cards/${selectedCard.id}/content`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...getAuthHeaders(token),
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) {
+      const contentResponseEn = await fetch(
+        `${API_BASE_URL}/cards/${selectedCard.id}/content`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(token),
+          },
+          body: JSON.stringify({
+            title: editorForm.title,
+            description: editorForm.description,
+            locale: "en",
+          }),
+        }
+      );
+      if (!contentResponseEn.ok) {
         throw new Error("No se pudo actualizar el contenido");
       }
-      await loadCards(token);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error inesperado");
-    }
-  };
 
-  const handleUpdateCardTags = async () => {
-    if (!token || !selectedCard) return;
-    setError(null);
-    try {
-      const response = await fetch(`${API_BASE_URL}/cards/${selectedCard.id}/tags`, {
+      const hasSpanishContent =
+        editorForm.title_es.trim().length > 0 || editorForm.description_es.trim().length > 0;
+      if (hasSpanishContent) {
+        const contentResponseEs = await fetch(
+          `${API_BASE_URL}/cards/${selectedCard.id}/content`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              ...getAuthHeaders(token),
+            },
+            body: JSON.stringify({
+              title: editorForm.title_es,
+              description: editorForm.description_es,
+              locale: "es",
+            }),
+          }
+        );
+        if (!contentResponseEs.ok) {
+          throw new Error("No se pudo actualizar el contenido");
+        }
+      }
+
+      const tagsResponse = await fetch(`${API_BASE_URL}/cards/${selectedCard.id}/tags`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -393,32 +455,27 @@ export default function App() {
           intensity: editorForm.intensity || "standard",
         }),
       });
-      if (!response.ok) {
+      if (!tagsResponse.ok) {
         throw new Error("No se pudo actualizar los tags");
       }
-      await loadCards(token);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error inesperado");
-    }
-  };
 
-  const handleUpdateCardGroupings = async () => {
-    if (!token || !selectedCard) return;
-    setError(null);
-    try {
-      const response = await fetch(`${API_BASE_URL}/cards/${selectedCard.id}/groupings`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...getAuthHeaders(token),
-        },
-        body: JSON.stringify({
-          grouping_ids: editorForm.grouping_ids,
-        }),
-      });
-      if (!response.ok) {
+      const groupingsResponse = await fetch(
+        `${API_BASE_URL}/cards/${selectedCard.id}/groupings`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(token),
+          },
+          body: JSON.stringify({
+            grouping_ids: editorForm.grouping_ids,
+          }),
+        }
+      );
+      if (!groupingsResponse.ok) {
         throw new Error("No se pudo actualizar los groupings");
       }
+
       await loadCards(token);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error inesperado");
@@ -764,143 +821,150 @@ export default function App() {
                   </label>
 
                   {selectedCard ? (
-                    <div className="editor-grid">
-                      <div>
-                        <h4>Contenido (EN)</h4>
-                        <label>
-                          Titulo
-                          <input
-                            value={editorForm.title}
-                            onChange={(event) =>
-                              setEditorForm((prev) => ({ ...prev, title: event.target.value }))
-                            }
+                    <>
+                      <div className="editor-grid">
+                        <div>
+                          <h4>Contenido (EN)</h4>
+                          <div className="stack">
+                            <TextField
+                              label="Titulo"
+                              value={editorForm.title}
+                              onChange={(event) =>
+                                setEditorForm((prev) => ({ ...prev, title: event.target.value }))
+                              }
+                              size="small"
+                              fullWidth
+                            />
+                            <TextField
+                              label="Descripcion"
+                              value={editorForm.description}
+                              onChange={(event) =>
+                                setEditorForm((prev) => ({
+                                  ...prev,
+                                  description: event.target.value,
+                                }))
+                              }
+                            size="small"
+                            fullWidth
+                            multiline
+                            minRows={3}
                           />
-                        </label>
-                        <label>
-                          Descripcion
-                        <textarea
-                          className="description-field"
-                          value={editorForm.description}
-                          onChange={(event) =>
-                            setEditorForm((prev) => ({
-                              ...prev,
-                              description: event.target.value,
-                              }))
-                            }
-                          />
-                        </label>
-                        <div className="editor-actions">
-                          <button type="button" onClick={() => handleUpdateCardContent("en")}>
-                            Guardar EN
-                          </button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4>Contenido (ES)</h4>
-                        <label>
-                          Titulo
-                          <input
-                            value={editorForm.title_es}
-                            onChange={(event) =>
-                              setEditorForm((prev) => ({ ...prev, title_es: event.target.value }))
-                            }
-                          />
-                        </label>
-                        <label>
-                          Descripcion
-                        <textarea
-                          className="description-field"
-                          value={editorForm.description_es}
-                          onChange={(event) =>
-                            setEditorForm((prev) => ({
-                              ...prev,
-                                description_es: event.target.value,
-                              }))
-                            }
-                          />
-                        </label>
-                        <div className="editor-actions">
-                          <button type="button" onClick={() => handleUpdateCardContent("es")}>
-                            Guardar ES
-                          </button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4>Tags e intensidad</h4>
-                        <label>
-                          Intensidad
-                          <select
-                            value={editorForm.intensity}
-                            onChange={(event) =>
-                              setEditorForm((prev) => ({ ...prev, intensity: event.target.value }))
-                            }
-                          >
-                            {intensityOptions.map((option) => (
-                              <option key={option.slug} value={option.slug}>
-                                {getTagLabel(option)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <div className="tag-selector">
-                          <div className="tag-grid">
-                            {selectableTags.map((tag) => (
-                              <label key={tag.id} className="checkbox">
-                                <input
-                                  type="checkbox"
-                                  checked={editorForm.tags.includes(tag.slug)}
-                                  onChange={() =>
-                                    setEditorForm((prev) => ({
-                                      ...prev,
-                                      tags: toggleTag(prev.tags, tag.slug),
-                                    }))
-                                  }
-                                />
-                                <span>{getTagLabel(tag)}</span>
-                              </label>
-                            ))}
                           </div>
                         </div>
-                        <div className="editor-actions">
-                          <button type="button" onClick={handleUpdateCardTags}>
-                            Guardar tags
-                          </button>
-                        </div>
-                      </div>
-                      <div>
-                        <h4>Groupings</h4>
-                        {sortedGroupings.length === 0 ? (
-                          <p className="muted">No hay groupings disponibles.</p>
-                        ) : (
-                          <div className="tag-selector">
-                            <div className="tag-grid">
-                              {sortedGroupings.map((grouping) => (
-                                <label key={grouping.id} className="checkbox">
-                                  <input
-                                    type="checkbox"
-                                    checked={editorForm.grouping_ids.includes(grouping.id)}
-                                    onChange={() =>
-                                      setEditorForm((prev) => ({
-                                        ...prev,
-                                        grouping_ids: toggleId(prev.grouping_ids, grouping.id),
-                                      }))
-                                    }
-                                  />
-                                  <span>{grouping.name}</span>
-                                </label>
-                              ))}
-                            </div>
+
+                        <div>
+                          <h4>Contenido (ES)</h4>
+                          <div className="stack">
+                            <TextField
+                              label="Titulo"
+                              value={editorForm.title_es}
+                              onChange={(event) =>
+                                setEditorForm((prev) => ({ ...prev, title_es: event.target.value }))
+                              }
+                              size="small"
+                              fullWidth
+                            />
+                            <TextField
+                              label="Descripcion"
+                              value={editorForm.description_es}
+                              onChange={(event) =>
+                                setEditorForm((prev) => ({
+                                  ...prev,
+                                  description_es: event.target.value,
+                                }))
+                              }
+                            size="small"
+                            fullWidth
+                            multiline
+                            minRows={3}
+                          />
                           </div>
-                        )}
-                        <div className="editor-actions">
-                          <button type="button" onClick={handleUpdateCardGroupings}>
-                            Guardar groupings
-                          </button>
+                        </div>
+
+                        <div>
+                          <h4>Tags e intensidad</h4>
+                          <div className="stack">
+                            <FormControl size="small" fullWidth>
+                              <InputLabel>Intensidad</InputLabel>
+                              <Select
+                                value={editorForm.intensity}
+                                label="Intensidad"
+                                onChange={(event) =>
+                                  setEditorForm((prev) => ({
+                                    ...prev,
+                                    intensity: event.target.value,
+                                  }))
+                                }
+                              >
+                                {intensityOptions.map((option) => (
+                                  <MenuItem key={option.slug} value={option.slug}>
+                                    {getTagLabel(option)}
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                            <FormControl size="small" fullWidth>
+                              <InputLabel>Tags</InputLabel>
+                              <Select
+                                multiple
+                                value={editorForm.tags}
+                                onChange={handleEditorTagsChange}
+                                input={<OutlinedInput label="Tags" />}
+                                renderValue={(selected) =>
+                                  (selected as string[])
+                                    .map((slug) => tagLabelBySlug.get(slug) || slug)
+                                    .join(", ")
+                                }
+                              >
+                                {selectableTags.map((tag) => (
+                                  <MenuItem key={tag.id} value={tag.slug}>
+                                    <Checkbox checked={editorForm.tags.includes(tag.slug)} />
+                                    <ListItemText primary={getTagLabel(tag)} />
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                          </div>
+                        </div>
+                        <div>
+                          <h4>Groupings</h4>
+                          {sortedGroupings.length === 0 ? (
+                            <p className="muted">No hay groupings disponibles.</p>
+                          ) : (
+                            <FormControl size="small" fullWidth>
+                              <InputLabel>Groupings</InputLabel>
+                              <Select
+                                multiple
+                                value={editorForm.grouping_ids}
+                                onChange={handleEditorGroupingsChange}
+                                input={<OutlinedInput label="Groupings" />}
+                                renderValue={(selected) =>
+                                  (selected as number[])
+                                    .map(
+                                      (id) =>
+                                        sortedGroupings.find((grouping) => grouping.id === id)
+                                          ?.name || String(id)
+                                    )
+                                    .join(", ")
+                                }
+                              >
+                                {sortedGroupings.map((grouping) => (
+                                  <MenuItem key={grouping.id} value={grouping.id}>
+                                    <Checkbox checked={editorForm.grouping_ids.includes(grouping.id)} />
+                                    <ListItemText primary={grouping.name} />
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                          )}
                         </div>
                       </div>
-                    </div>
+                      <div className="editor-actions">
+                        <button type="button" onClick={handleSaveCardEdits}>
+                          Guardar cambios
+                        </button>
+                      </div>
+                    </>
                   ) : (
                     <p className="muted">Selecciona una carta para editar contenido y tags.</p>
                   )}
@@ -1186,50 +1250,56 @@ export default function App() {
                       ))}
                     </select>
                   </label>
-                  <div className="tag-selector">
-                    <p>Tags</p>
-                    <div className="tag-grid">
+                  <FormControl size="small" fullWidth>
+                    <InputLabel>Tags</InputLabel>
+                    <Select
+                      multiple
+                      value={createForm.tags}
+                      onChange={handleCreateTagsChange}
+                      input={<OutlinedInput label="Tags" />}
+                      renderValue={(selected) =>
+                        (selected as string[])
+                          .map((slug) => tagLabelBySlug.get(slug) || slug)
+                          .join(", ")
+                      }
+                    >
                       {selectableTags.map((tag) => (
-                        <label key={tag.id} className="checkbox">
-                          <input
-                            type="checkbox"
-                            checked={createForm.tags.includes(tag.slug)}
-                            onChange={() =>
-                              setCreateForm((prev) => ({
-                                ...prev,
-                                tags: toggleTag(prev.tags, tag.slug),
-                              }))
-                            }
-                          />
-                          <span>{getTagLabel(tag)}</span>
-                        </label>
+                        <MenuItem key={tag.id} value={tag.slug}>
+                          <Checkbox checked={createForm.tags.includes(tag.slug)} />
+                          <ListItemText primary={getTagLabel(tag)} />
+                        </MenuItem>
                       ))}
-                    </div>
-                  </div>
-                  <div className="tag-selector">
-                    <p>Groupings</p>
-                    {sortedGroupings.length === 0 ? (
-                      <p className="muted">No hay groupings disponibles.</p>
-                    ) : (
-                      <div className="tag-grid">
+                    </Select>
+                  </FormControl>
+                  {sortedGroupings.length === 0 ? (
+                    <p className="muted">No hay groupings disponibles.</p>
+                  ) : (
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>Groupings</InputLabel>
+                      <Select
+                        multiple
+                        value={createForm.grouping_ids}
+                        onChange={handleCreateGroupingsChange}
+                        input={<OutlinedInput label="Groupings" />}
+                        renderValue={(selected) =>
+                          (selected as number[])
+                            .map(
+                              (id) =>
+                                sortedGroupings.find((grouping) => grouping.id === id)?.name ||
+                                String(id)
+                            )
+                            .join(", ")
+                        }
+                      >
                         {sortedGroupings.map((grouping) => (
-                          <label key={grouping.id} className="checkbox">
-                            <input
-                              type="checkbox"
-                              checked={createForm.grouping_ids.includes(grouping.id)}
-                              onChange={() =>
-                                setCreateForm((prev) => ({
-                                  ...prev,
-                                  grouping_ids: toggleId(prev.grouping_ids, grouping.id),
-                                }))
-                              }
-                            />
-                            <span>{grouping.name}</span>
-                          </label>
+                          <MenuItem key={grouping.id} value={grouping.id}>
+                            <Checkbox checked={createForm.grouping_ids.includes(grouping.id)} />
+                            <ListItemText primary={grouping.name} />
+                          </MenuItem>
                         ))}
-                      </div>
-                    )}
-                  </div>
+                      </Select>
+                    </FormControl>
+                  )}
                   <button type="submit">Crear carta</button>
                 </form>
               </div>
