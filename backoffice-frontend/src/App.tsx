@@ -406,78 +406,33 @@ export default function App() {
     if (!token || !selectedCard) return;
     setError(null);
     try {
-      const contentResponseEn = await fetch(
-        `${API_BASE_URL}/cards/${selectedCard.id}/content`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            ...getAuthHeaders(token),
-          },
-          body: JSON.stringify({
-            title: editorForm.title,
-            description: editorForm.description,
-            locale: "en",
-          }),
-        }
-      );
-      if (!contentResponseEn.ok) {
-        throw new Error("No se pudo actualizar el contenido");
-      }
-
+      const translations: Record<string, { title?: string; description?: string }> = {};
       const hasSpanishContent =
         editorForm.title_es.trim().length > 0 || editorForm.description_es.trim().length > 0;
       if (hasSpanishContent) {
-        const contentResponseEs = await fetch(
-          `${API_BASE_URL}/cards/${selectedCard.id}/content`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-              ...getAuthHeaders(token),
-            },
-            body: JSON.stringify({
-              title: editorForm.title_es,
-              description: editorForm.description_es,
-              locale: "es",
-            }),
-          }
-        );
-        if (!contentResponseEs.ok) {
-          throw new Error("No se pudo actualizar el contenido");
-        }
+        translations.es = {
+          title: editorForm.title_es,
+          description: editorForm.description_es,
+        };
       }
 
-      const tagsResponse = await fetch(`${API_BASE_URL}/cards/${selectedCard.id}/tags`, {
+      const response = await fetch(`${API_BASE_URL}/cards/${selectedCard.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           ...getAuthHeaders(token),
         },
         body: JSON.stringify({
+          title: editorForm.title,
+          description: editorForm.description,
+          translations,
           tags: editorForm.tags,
           intensity: editorForm.intensity || "standard",
+          grouping_ids: editorForm.grouping_ids,
         }),
       });
-      if (!tagsResponse.ok) {
-        throw new Error("No se pudo actualizar los tags");
-      }
-
-      const groupingsResponse = await fetch(
-        `${API_BASE_URL}/cards/${selectedCard.id}/groupings`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            ...getAuthHeaders(token),
-          },
-          body: JSON.stringify({
-            grouping_ids: editorForm.grouping_ids,
-          }),
-        }
-      );
-      if (!groupingsResponse.ok) {
-        throw new Error("No se pudo actualizar los groupings");
+      if (!response.ok) {
+        throw new Error("No se pudo actualizar la carta");
       }
 
       await loadCards(token);

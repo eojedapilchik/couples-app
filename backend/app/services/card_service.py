@@ -563,6 +563,88 @@ class CardService:
         )
 
     @staticmethod
+    def update_card_admin(
+        db: Session,
+        card_id: int,
+        title: str | None = None,
+        description: str | None = None,
+        translations: dict[str, dict] | None = None,
+        tags: list[str] | None = None,
+        intensity: str | None = None,
+        grouping_ids: list[int] | None = None,
+    ) -> dict | None:
+        """Update card content, translations, tags, and groupings in one call."""
+        import json
+
+        card = CardService.get_card(db, card_id)
+        if not card:
+            return None
+
+        if title is not None:
+            card.title = title
+        if description is not None:
+            card.description = description
+
+        if translations:
+            for locale, payload in translations.items():
+                if locale == "en":
+                    if payload.get("title") is not None:
+                        card.title = payload["title"]
+                    if payload.get("description") is not None:
+                        card.description = payload["description"]
+                    continue
+
+                translation = db.query(CardTranslation).filter(
+                    CardTranslation.card_id == card_id,
+                    CardTranslation.locale == locale,
+                ).first()
+                if translation:
+                    if payload.get("title") is not None:
+                        translation.title = payload["title"]
+                    if payload.get("description") is not None:
+                        translation.description = payload["description"]
+                else:
+                    if payload.get("title") is None and payload.get("description") is None:
+                        continue
+                    translation = CardTranslation(
+                        card_id=card_id,
+                        locale=locale,
+                        title=payload.get("title") or card.title,
+                        description=payload.get("description") or card.description,
+                    )
+                    db.add(translation)
+
+        if tags is not None or intensity is not None:
+            existing_tags = []
+            existing_intensity = "standard"
+            if card.tags:
+                try:
+                    parsed = json.loads(card.tags)
+                    existing_tags = parsed.get("tags", []) if isinstance(parsed.get("tags"), list) else []
+                    existing_intensity = parsed.get("intensity") or existing_intensity
+                except Exception:
+                    pass
+
+            tags_data = {
+                "tags": tags if tags is not None else existing_tags,
+                "intensity": intensity if intensity is not None else existing_intensity,
+            }
+            card.tags = json.dumps(tags_data)
+
+        if grouping_ids is not None:
+            groupings = []
+            if grouping_ids:
+                groupings = db.query(Grouping).filter(Grouping.id.in_(grouping_ids)).all()
+            card.groupings = groupings
+
+        db.commit()
+        db.refresh(card)
+
+        return CardService._build_card_dict(
+            db, card, locale="es", include_tags_list=True, include_groupings_list=True
+        )
+
+    @staticmethod
     def update_card_content(
         db: Session,
         card_id: int,

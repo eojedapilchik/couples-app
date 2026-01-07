@@ -93,6 +93,22 @@ class CardContentUpdate(BaseModel):
     locale: str = Field(default="en", description="Locale: 'en' for base card, 'es' for translation")
 
 
+class CardTranslationUpdate(BaseModel):
+    """Update payload for a specific translation locale."""
+    title: str | None = Field(default=None, min_length=1, max_length=500)
+    description: str | None = Field(default=None, min_length=1)
+
+
+class CardUpdateAdmin(BaseModel):
+    """Request to update a card (admin)."""
+    title: str | None = Field(default=None, min_length=1, max_length=500)
+    description: str | None = Field(default=None, min_length=1)
+    translations: dict[str, CardTranslationUpdate] = Field(default_factory=dict)
+    tags: list[str] | None = None
+    intensity: str | None = None
+    grouping_ids: list[int] | None = None
+
+
 class CardCreateAdmin(BaseModel):
     """Request to create a new card (admin)."""
     title: str = Field(..., min_length=1, max_length=200)

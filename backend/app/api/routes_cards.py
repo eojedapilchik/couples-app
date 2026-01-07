@@ -16,6 +16,7 @@ from app.schemas.card import (
     CardTagsUpdate,
     CardGroupingsUpdate,
     CardContentUpdate,
+    CardUpdateAdmin,
     CardCreateAdmin,
 )
 from app.services.card_service import CardService
@@ -279,6 +280,33 @@ def update_card_tags(
 
     card_dict = CardService.update_card_tags(
         db, card_id, tags_update.tags, tags_update.intensity
+    )
+    if not card_dict:
+        raise HTTPException(status_code=404, detail="Carta no encontrada")
+
+    return card_dict
+
+
+@router.patch("/{card_id}")
+def update_card_admin(
+    card_id: int,
+    card_update: CardUpdateAdmin,
+    user_id: int | None = Query(None, description="Admin user ID"),
+    backoffice_user: BackofficeUser | None = Depends(get_backoffice_user_optional),
+    db: Session = Depends(get_db),
+):
+    """Update a card (admin only)."""
+    require_admin_access(db, user_id, backoffice_user)
+
+    card_dict = CardService.update_card_admin(
+        db,
+        card_id,
+        title=card_update.title,
+        description=card_update.description,
+        translations=card_update.translations,
+        tags=card_update.tags,
+        intensity=card_update.intensity,
+        grouping_ids=card_update.grouping_ids,
     )
     if not card_dict:
         raise HTTPException(status_code=404, detail="Carta no encontrada")
