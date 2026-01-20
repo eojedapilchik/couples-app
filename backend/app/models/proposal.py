@@ -1,6 +1,6 @@
 """Proposal model - Weekly dares/card proposals."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from sqlalchemy import Integer, String, DateTime, ForeignKey, Text, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -78,7 +78,7 @@ class Proposal(Base):
         SQLEnum(ProposalStatus), default=ProposalStatus.PROPOSED
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
     responded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_requested_at: Mapped[datetime | None] = mapped_column(

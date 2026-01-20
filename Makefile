@@ -6,6 +6,9 @@ MYSQL_FILE ?= docker-compose.yml
 PYTHON ?= python3
 UV_CACHE_DIR := $(or $(UV_CACHE_DIR),/tmp/uv-cache)
 UV_PYTHON ?= 3.12
+TEST_DB_HOST ?=
+TEST_DB_PORT ?=
+TEST_DB_START_DOCKER ?= 1
 
 .PHONY: help init init-mysql up up-mysql down down-mysql logs logs-mysql rebuild rebuild-mysql migrate migrate-mysql migrate-mysql-build seed seed-mysql reset-db reset-db-mysql test-backend deploy
 
@@ -81,8 +84,15 @@ reset-db-mysql:
 	$(COMPOSE) -f $(MYSQL_FILE) --profile mysql down -v
 
 test-backend:
-	UV_CACHE_DIR=$(UV_CACHE_DIR) uv pip install --python $(UV_PYTHON) -r backend/requirements.txt
-	UV_CACHE_DIR=$(UV_CACHE_DIR) uv run --python $(UV_PYTHON) -m pytest backend/tests
+	@if [ ! -d .venv ]; then UV_CACHE_DIR=$(UV_CACHE_DIR) uv venv --python $(UV_PYTHON); fi
+	@if [ "$(TEST_DB_START_DOCKER)" = "1" ] && ([ -z "$(TEST_DB_HOST)" ] || [ "$(TEST_DB_HOST)" = "127.0.0.1" ] || [ "$(TEST_DB_HOST)" = "localhost" ]); then \
+		$(COMPOSE) -f $(MYSQL_FILE) --profile mysql up -d mysql; \
+	fi
+	UV_CACHE_DIR=$(UV_CACHE_DIR) uv pip install -r backend/requirements.txt
+	UV_CACHE_DIR=$(UV_CACHE_DIR) \
+	$(if $(TEST_DB_HOST),TEST_DB_HOST=$(TEST_DB_HOST)) \
+	$(if $(TEST_DB_PORT),TEST_DB_PORT=$(TEST_DB_PORT)) \
+	uv run -m pytest backend/tests
 
 deploy:
 	ssh ${DEPLOY_HOST:-bastion} "sh ${DEPLOY_APP_DIR:-~/apps/couples-app}/deploy.sh"

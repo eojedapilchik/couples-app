@@ -1,6 +1,6 @@
 """Proposal Service - State machine and business rules."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.proposal import Proposal, ProposalStatus, ChallengeType, RewardType
@@ -174,7 +174,7 @@ class ProposalService:
             proposal.credit_cost = credit_cost
 
         proposal.status = response
-        proposal.responded_at = datetime.utcnow()
+        proposal.responded_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(proposal)
         return proposal
@@ -206,7 +206,7 @@ class ProposalService:
             )
 
         proposal.status = ProposalStatus.COMPLETED_PENDING_CONFIRMATION
-        proposal.completed_requested_at = datetime.utcnow()
+        proposal.completed_requested_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(proposal)
         return proposal
@@ -242,7 +242,7 @@ class ProposalService:
 
         # Update status
         proposal.status = ProposalStatus.COMPLETED_CONFIRMED
-        proposal.completed_confirmed_at = datetime.utcnow()
+        proposal.completed_confirmed_at = datetime.now(timezone.utc)
 
         # Award credits to recipient
         CreditService.award_completion_reward(

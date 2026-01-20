@@ -1,6 +1,6 @@
 """Period model - Game periods (week/month/2-month)."""
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from enum import Enum
 from sqlalchemy import String, Integer, Date, DateTime, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -35,7 +35,7 @@ class Period(Base):
     weekly_base_credits: Mapped[int] = mapped_column(Integer, default=3)
     cards_to_play_per_week: Mapped[int] = mapped_column(Integer, default=3)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
     # Relationships

@@ -1,6 +1,6 @@
 """Credit models - Balance and Ledger (source of truth)."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from sqlalchemy import Integer, String, DateTime, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -49,7 +49,7 @@ class CreditLedger(Base):
     amount: Mapped[int] = mapped_column(Integer, nullable=False)  # + or -
     note: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
     # Relationships
