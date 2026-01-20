@@ -9,13 +9,13 @@ services:
       - db_data:/data
       - ./card_templates:/app/card_templates:ro
     environment:
-      - DB_TYPE=${DB_TYPE:-sqlite}
-      - SQLITE_PATH=/data/couple_cards.db
-      - MYSQL_HOST=mysql
-      - MYSQL_PORT=3306
-      - MYSQL_USER=couple_cards
-      - MYSQL_PASSWORD=couple_cards_secret
-      - MYSQL_DATABASE=couple_cards
+      - DB_TYPE=${DB_TYPE}
+      - SQLITE_PATH=${SQLITE_PATH}
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_PORT=${MYSQL_PORT}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
     networks:
       - couple-cards-network
     ports:
@@ -26,10 +26,10 @@ services:
     container_name: couple-cards-mysql
     restart: unless-stopped
     environment:
-      - MYSQL_ROOT_PASSWORD=root_secret
-      - MYSQL_DATABASE=couple_cards
-      - MYSQL_USER=couple_cards
-      - MYSQL_PASSWORD=couple_cards_secret
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     volumes:
       - mysql_data:/var/lib/mysql
     ports:
@@ -82,13 +82,13 @@ services:
       - db_data:/data
       - ./card_templates:/app/card_templates:ro
     environment:
-      - DB_TYPE=${DB_TYPE:-sqlite}
-      - SQLITE_PATH=/data/couple_cards.db
-      - MYSQL_HOST=mysql
-      - MYSQL_PORT=3306
-      - MYSQL_USER=couple_cards
-      - MYSQL_PASSWORD=couple_cards_secret
-      - MYSQL_DATABASE=couple_cards
+      - DB_TYPE=${DB_TYPE}
+      - SQLITE_PATH=${SQLITE_PATH}
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_PORT=${MYSQL_PORT}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
     command: python seed_cards.py
     networks:
       - couple-cards-network
@@ -103,13 +103,13 @@ services:
     volumes:
       - db_data:/data
     environment:
-      - DB_TYPE=${DB_TYPE:-sqlite}
-      - SQLITE_PATH=/data/couple_cards.db
-      - MYSQL_HOST=mysql
-      - MYSQL_PORT=3306
-      - MYSQL_USER=couple_cards
-      - MYSQL_PASSWORD=couple_cards_secret
-      - MYSQL_DATABASE=couple_cards
+      - DB_TYPE=${DB_TYPE}
+      - SQLITE_PATH=${SQLITE_PATH}
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_PORT=${MYSQL_PORT}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
     command: alembic upgrade head
     networks:
       - couple-cards-network

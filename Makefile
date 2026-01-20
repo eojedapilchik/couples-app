@@ -3,8 +3,9 @@ SHELL := /bin/sh
 COMPOSE ?= docker compose
 SQLITE_FILE ?= docker-compose.sqlite.yml
 MYSQL_FILE ?= docker-compose.yml
+PYTHON ?= python3
 
-.PHONY: help init init-mysql up up-mysql down down-mysql logs logs-mysql rebuild rebuild-mysql migrate migrate-mysql seed seed-mysql reset-db reset-db-mysql
+.PHONY: help init init-mysql up up-mysql down down-mysql logs logs-mysql rebuild rebuild-mysql migrate migrate-mysql migrate-mysql-build seed seed-mysql reset-db reset-db-mysql test-backend deploy
 
 help:
 	@echo "Targets:"
@@ -20,10 +21,13 @@ help:
 	@echo "  rebuild-mysql Rebuild mysql stack"
 	@echo "  migrate      Run sqlite migrations"
 	@echo "  migrate-mysql Run mysql migrations"
+	@echo "  migrate-mysql-build Run mysql migrations with rebuild"
 	@echo "  seed         Seed sqlite data"
 	@echo "  seed-mysql   Seed mysql data"
 	@echo "  reset-db     Drop sqlite volumes"
 	@echo "  reset-db-mysql Drop mysql volumes"
+	@echo "  test-backend  Run backend tests (pytest)"
+	@echo "  deploy        Pull latest, build, and migrate (mysql profile)"
 
 init: up migrate seed
 
@@ -59,6 +63,9 @@ migrate:
 migrate-mysql:
 	$(COMPOSE) -f $(MYSQL_FILE) --profile migrate up migrate
 
+migrate-mysql-build:
+	$(COMPOSE) -f $(MYSQL_FILE) --profile migrate up --build migrate
+
 seed:
 	$(COMPOSE) -f $(SQLITE_FILE) --profile seed up seed
 
@@ -70,3 +77,9 @@ reset-db:
 
 reset-db-mysql:
 	$(COMPOSE) -f $(MYSQL_FILE) --profile mysql down -v
+
+test-backend:
+	uv run -m pytest backend/tests
+
+deploy:
+	ssh ${DEPLOY_HOST:-bastion} "sh ${DEPLOY_APP_DIR:-~/apps/couples-app}/deploy.sh"
