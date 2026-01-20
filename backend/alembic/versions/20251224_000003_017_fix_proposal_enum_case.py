@@ -23,16 +23,15 @@ def upgrade() -> None:
     if dialect != "mysql":
         return
 
-    # Expand enums to allow both cases, normalize data, then lock to uppercase names.
+    # MySQL enums are case-insensitive, so we can't temporarily include both.
+    # Use VARCHAR as a bridge, then normalize and lock to uppercase.
     op.execute(
         "ALTER TABLE proposals MODIFY COLUMN challenge_type "
-        "ENUM('simple', 'guided', 'custom', 'SIMPLE', 'GUIDED', 'CUSTOM') "
-        "NOT NULL DEFAULT 'SIMPLE'"
+        "VARCHAR(20) NOT NULL"
     )
     op.execute(
         "ALTER TABLE proposals MODIFY COLUMN reward_type "
-        "ENUM('none', 'credits', 'coupon', 'choose_next', "
-        "'NONE', 'CREDITS', 'COUPON', 'CHOOSE_NEXT') NULL"
+        "VARCHAR(20) NULL"
     )
     op.execute("UPDATE proposals SET challenge_type = UPPER(challenge_type)")
     op.execute(
@@ -57,13 +56,11 @@ def downgrade() -> None:
 
     op.execute(
         "ALTER TABLE proposals MODIFY COLUMN challenge_type "
-        "ENUM('simple', 'guided', 'custom', 'SIMPLE', 'GUIDED', 'CUSTOM') "
-        "NOT NULL DEFAULT 'simple'"
+        "VARCHAR(20) NOT NULL"
     )
     op.execute(
         "ALTER TABLE proposals MODIFY COLUMN reward_type "
-        "ENUM('none', 'credits', 'coupon', 'choose_next', "
-        "'NONE', 'CREDITS', 'COUPON', 'CHOOSE_NEXT') NULL"
+        "VARCHAR(20) NULL"
     )
     op.execute("UPDATE proposals SET challenge_type = LOWER(challenge_type)")
     op.execute(
