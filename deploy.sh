@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu pipefail
 
-APP_DIR="${DEPLOY_APP_DIR:-~/apps/couples-app/}"
+APP_DIR="${DEPLOY_APP_DIR:-$HOME/apps/couples-app}"
 COMPOSE_FILE="${DEPLOY_COMPOSE_FILE:-docker-compose.yml}"
 
 cd "$APP_DIR"
